@@ -7,6 +7,8 @@ from io import BytesIO, StringIO
 import time
 import openpyxl
 import json
+import tempfile
+import os
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 try:
@@ -262,9 +264,6 @@ def scrape_booking_data(url):
     if not SELENIUM_AVAILABLE:
         return None, "Selenium chưa được cài đặt. Vui lòng chạy: pip install selenium webdriver-manager"
     
-    import tempfile
-    import os
-    
     temp_dir = tempfile.mkdtemp(prefix='selenium_booking_')
     
     options = Options()
@@ -306,10 +305,14 @@ def scrape_booking_data(url):
         
         try:
             page_source = driver.page_source
-            with open('/tmp/booking_booking_debug.html', 'w', encoding='utf-8') as f:
+            # Lưu HTML để debug - dùng thư mục temp của Windows
+            temp_dir_path = tempfile.gettempdir()
+            debug_path = os.path.join(temp_dir_path, 'booking_debug.html')
+            with open(debug_path, 'w', encoding='utf-8') as f:
                 f.write(page_source)
-        except:
-            pass
+            print(f"DEBUG: Saved HTML to {debug_path}")
+        except Exception as e:
+            print(f"DEBUG: Could not save HTML: {e}")
 
         try:
             WebDriverWait(driver, 20).until(
@@ -387,9 +390,21 @@ def scrape_booking_data(url):
 
         try:
             room_rows = driver.find_elements(By.CSS_SELECTOR, 'tr.js-rt-block-row')
+            print(f"DEBUG: Found {len(room_rows)} room rows")
             
-            for row in room_rows:
+            for idx, row in enumerate(room_rows):
                 try:
+                    # Lưu HTML của row để debug
+                    try:
+                        row_html = row.get_attribute('outerHTML')
+                        temp_dir = tempfile.gettempdir()
+                        row_debug_path = os.path.join(temp_dir, f'booking_row_{idx}.html')
+                        with open(row_debug_path, 'w', encoding='utf-8') as f:
+                            f.write(row_html)
+                        print(f"DEBUG: Saved row {idx} HTML to {row_debug_path}")
+                    except:
+                        pass
+                    
                     room_data = {
                         'room_type': None,
                         'price': None,
@@ -467,9 +482,12 @@ def scrape_booking_data(url):
                             pass
                     
                     try:
+                        # Lấy các điều kiện đặt phòng (ở cột Các lựa chọn)
                         choice_elems = row.find_elements(By.CSS_SELECTOR, '.hprt-table-cell-conditions li')
+                        print(f"DEBUG: Found {len(choice_elems)} conditions in .hprt-table-cell-conditions li")
                         for choice in choice_elems:
                             choice_text = choice.text.strip()
+                            print(f"DEBUG: Condition text: {choice_text}")
                             choice_text = re.sub(r'^[•\-–—]\s*', '', choice_text)
                             choice_text = choice_text.strip()
                             if choice_text:
@@ -477,14 +495,18 @@ def scrape_booking_data(url):
 
                         if not room_data['facilities']:
                             choice_elems = row.find_elements(By.CSS_SELECTOR, '.hprt-conditions li')
+                            print(f"DEBUG: Found {len(choice_elems)} conditions in .hprt-conditions li")
                             for choice in choice_elems:
                                 choice_text = choice.text.strip()
+                                print(f"DEBUG: Condition text: {choice_text}")
                                 choice_text = re.sub(r'^[•\-–—]\s*', '', choice_text)
                                 choice_text = choice_text.strip()
                                 if choice_text:
-                                    room_data['facilities'].append(choice_text)
-                    except:
-                        pass
+                                    room_data['facilities'].append(choice_text)                    
+                        
+                        print(f"DEBUG: Final facilities list: {room_data['facilities']}")
+                    except Exception as e:
+                        print(f"DEBUG: Error getting facilities: {e}")
 
                     try:
                         price_elem = row.find_element(By.CSS_SELECTOR, '.bui-price-display__value')

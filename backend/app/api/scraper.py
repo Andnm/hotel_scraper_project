@@ -148,37 +148,33 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                         elif data:
                             if data.get('rooms') and len(data['rooms']) > 0:
                                 for room in data['rooms']:
-                                    price_clean = room.get('price', 'N/A')
-                                    if price_clean and price_clean != 'N/A':
+                                    price_clean = room.get('price', '')
+                                    if price_clean:
                                         price_clean = re.sub(r'[^\d]', '', str(price_clean))
-                                    else:
-                                        price_clean = 'N/A'
                                     
-                                    price_orig_clean = room.get('price_original', 'N/A')
-                                    if price_orig_clean and price_orig_clean != 'N/A':
+                                    price_orig_clean = room.get('price_original', '')
+                                    if price_orig_clean:
                                         price_orig_clean = re.sub(r'[^\d]', '', str(price_orig_clean))
-                                    else:
-                                        price_orig_clean = 'N/A'
                                     
                                     bed_list = room.get('bed_options', [])
-                                    bed_text = ' hoặc '.join(bed_list) if bed_list else 'N/A'
+                                    bed_text = ' hoặc '.join(bed_list) if bed_list else ''
                                     facilities_list = room.get('facilities', [])
-                                    facilities_text = '\n'.join(facilities_list) if facilities_list else 'N/A'
+                                    facilities_text = '\n'.join(facilities_list) if facilities_list else ''
                                     
                                     results.append({
                                         'Hàng_gốc': row_num,
                                         'Ngày cào': datetime.now().strftime('%Y-%m-%d'),
                                         'Ngày cần cào': target_date_str,
-                                        'Tên khách sạn': data.get('hotel_name', 'N/A'),
+                                        'Tên khách sạn': data.get('hotel_name', ''),
                                         'Link khách sạn': url,
                                         'Giá sau giảm': price_clean,
                                         'Giá gốc': price_orig_clean,
-                                        'Số lượng review': data.get('review_count', 'N/A'),
-                                        'Điểm review': data.get('rating', 'N/A'),
-                                        'Tên hạng phòng': room.get('room_type', 'N/A'),
-                                        'Số lượng người': room.get('num_guests', 'N/A'),
+                                        'Số lượng review': data.get('review_count', ''),
+                                        'Điểm review': data.get('rating', ''),
+                                        'Tên hạng phòng': room.get('room_type', ''),
+                                        'Số lượng người': room.get('num_guests', ''),
                                         'Giường': bed_text,
-                                        'Diện tích phòng': room.get('room_size', 'N/A'),
+                                        'Diện tích phòng': room.get('room_size', ''),
                                         'Các lựa chọn': facilities_text
                                     })
                                 
@@ -189,6 +185,23 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                                     'rooms_count': len(data['rooms'])
                                 }, websocket)
                             else:
+                                # No room data found - thêm row rỗng
+                                results.append({
+                                    'Hàng_gốc': row_num,
+                                    'Ngày cào': datetime.now().strftime('%Y-%m-%d'),
+                                    'Ngày cần cào': target_date_str,
+                                    'Tên khách sạn': data.get('hotel_name', ''),
+                                    'Link khách sạn': url,
+                                    'Giá sau giảm': '',
+                                    'Giá gốc': '',
+                                    'Số lượng review': '',
+                                    'Điểm review': '',
+                                    'Tên hạng phòng': '',
+                                    'Số lượng người': '',
+                                    'Giường': '',
+                                    'Diện tích phòng': '',
+                                    'Các lựa chọn': ''
+                                })
                                 errors.append({
                                     'Hàng': row_num,
                                     'Tên': link_info.get('cell_value', ''),
@@ -196,6 +209,23 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                                     'Lỗi': 'No room data found'
                                 })
                     except Exception as e:
+                        # Thêm row rỗng khi có lỗi
+                        results.append({
+                            'Hàng_gốc': row_num,
+                            'Ngày cào': datetime.now().strftime('%Y-%m-%d'),
+                            'Ngày cần cào': target_date_str,
+                            'Tên khách sạn': '',
+                            'Link khách sạn': url,
+                            'Giá sau giảm': '',
+                            'Giá gốc': '',
+                            'Số lượng review': '',
+                            'Điểm review': '',
+                            'Tên hạng phòng': '',
+                            'Số lượng người': '',
+                            'Giường': '',
+                            'Diện tích phòng': '',
+                            'Các lựa chọn': ''
+                        })
                         errors.append({
                             'Hàng': row_num,
                             'Tên': link_info.get('cell_value', ''),

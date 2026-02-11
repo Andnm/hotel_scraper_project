@@ -247,13 +247,37 @@ async function startScraping() {
 }
 
 function downloadExcel() {
-  // TODO: Implement Excel export
-  toast.add({
-    severity: 'info',
-    summary: 'Tính năng',
-    detail: 'Tính năng xuất Excel đang được phát triển',
-    life: 3000
-  })
+  try {
+    import('xlsx').then((XLSX) => {
+      // Tạo worksheet từ results
+      const ws = XLSX.utils.json_to_sheet(scraperStore.results)
+      
+      // Tạo workbook
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Kết quả')
+      
+      // Tạo filename với timestamp
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+      const filename = `booking_scrape_${timestamp}.xlsx`
+      
+      // Download file
+      XLSX.writeFile(wb, filename)
+      
+      toast.add({
+        severity: 'success',
+        summary: 'Thành công',
+        detail: 'Đã tải xuống file Excel',
+        life: 3000
+      })
+    })
+  } catch (error: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: 'Không thể tải xuống Excel: ' + error.message,
+      life: 5000
+    })
+  }
 }
 
 function saveHistory() {
