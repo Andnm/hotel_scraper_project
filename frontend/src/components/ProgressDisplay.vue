@@ -76,7 +76,7 @@
     <template #content>
       <div class="completion-message">
         <i class="pi pi-check-circle success-icon"></i>
-        <h3>✅ Hoàn thành cào dữ liệu!</h3>
+        <h3>Hoàn thành cào dữ liệu!</h3>
         <p>
           Đã cào xong {{ scraperStore.successCount }} khách sạn
           <span v-if="scraperStore.errorCount > 0"> ({{ scraperStore.errorCount }} lỗi)</span>

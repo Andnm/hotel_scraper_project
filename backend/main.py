@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api import scraper, history
+from app.api import scraper, history, sources
 
 app = FastAPI(
     title=settings.APP_TITLE,
@@ -19,6 +19,7 @@ app.add_middleware(
 
 app.include_router(scraper.router, tags=["Scraper"])
 app.include_router(history.router, tags=["History"])
+app.include_router(sources.router, tags=["Sources"])
 
 @app.get("/")
 async def root():

@@ -5,15 +5,37 @@ from app.core.database import get_db_connection
 
 class CrawlHistoryRepository:
     
-    def create_history(self, crawl_date: date, crawl_target: str, source: str = 'booking') -> int:
+    def create_history(
+        self, 
+        crawl_date: date, 
+        crawl_target: str, 
+        source: str = 'booking',
+        scrape_type: str = 'info',
+        market: str = None,
+        check_in: date = None,
+        check_out: date = None
+    ) -> int:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             try:
+                from datetime import datetime
+                crawl_time = datetime.now().time()
+                
                 query = """
-                    INSERT INTO crawl_history (crawl_date, crawl_target, source, total_records)
-                    VALUES (%s, %s, %s, 0)
+                    INSERT INTO crawl_history 
+                    (crawl_date, crawl_time, crawl_target, source, scrape_type, market, check_in, check_out, total_records)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0)
                 """
-                cursor.execute(query, (crawl_date, crawl_target, source))
+                cursor.execute(query, (
+                    crawl_date, 
+                    crawl_time,
+                    crawl_target, 
+                    source, 
+                    scrape_type,
+                    market,
+                    check_in,
+                    check_out
+                ))
                 conn.commit()
                 history_id = cursor.lastrowid
                 return history_id
@@ -173,12 +195,18 @@ class CrawlDataRepository:
                         'target_date': data.get('Ngày cần cào', '')
                     }
                     
+                    popular_facilities = data.get('Các tiện nghi được ưa chuộng nhất', '')
+                    if isinstance(popular_facilities, list):
+                        popular_facilities = ', '.join(popular_facilities)
+                    
                     values.append((
                         history_id,
                         data.get('Tên khách sạn', 'N/A'),
                         data.get('Link khách sạn', ''),
+                        popular_facilities,
                         price_after,
                         price_orig,
+                        data.get('Giảm giá', ''),
                         review_count,
                         review_score,
                         data.get('Tên hạng phòng', 'N/A'),
@@ -190,10 +218,11 @@ class CrawlDataRepository:
                 
                 query = """
                     INSERT INTO crawl_data (
-                        history_id, hotel_name, hotel_link, price_after_discount,
-                        price_original, review_count, review_score, room_type,
+                        history_id, hotel_name, hotel_link, popular_facilities,
+                        price_after_discount, price_original, discount_percent,
+                        review_count, review_score, room_type,
                         num_people, bed_info, room_area, options
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 
                 cursor.executemany(query, values)
@@ -375,3 +404,120 @@ class CrawlDataRepository:
             return float(value)
         except:
             return None
+
+
+class SavedDataSourceRepository:
+    
+    def create_source(self, name: str, source_type: str, file_path: str = None, sheets_url: str = None) -> int:
+        """Tạo saved data source mới"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                query = """
+                    INSERT INTO saved_data_sources (name, source_type, file_path, sheets_url, is_active)
+                    VALUES (%s, %s, %s, %s, TRUE)
+                """
+                cursor.execute(query, (name, source_type, file_path, sheets_url))
+                conn.commit()
+                source_id = cursor.lastrowid
+                return source_id
+            except Exception as e:
+                conn.rollback()
+                raise Exception(f"Error creating saved source: {str(e)}")
+            finally:
+                cursor.close()
+    
+    def get_all_sources(self, active_only: bool = True) -> List[Dict]:
+        """Lấy tất cả saved sources"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            try:
+                query = "SELECT * FROM saved_data_sources"
+                if active_only:
+                    query += " WHERE is_active = TRUE"
+                query += " ORDER BY created_at DESC"
+                
+                cursor.execute(query)
+                results = cursor.fetchall()
+                return results
+            except Exception as e:
+                raise Exception(f"Error getting saved sources: {str(e)}")
+            finally:
+                cursor.close()
+    
+    def get_source_by_id(self, source_id: int) -> Optional[Dict]:
+        """Lấy source theo ID"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            try:
+                query = "SELECT * FROM saved_data_sources WHERE id = %s"
+                cursor.execute(query, (source_id,))
+                result = cursor.fetchone()
+                return result
+            except Exception as e:
+                raise Exception(f"Error getting saved source: {str(e)}")
+            finally:
+                cursor.close()
+    
+    def update_source(self, source_id: int, name: str = None, file_path: str = None, sheets_url: str = None):
+        """Cập nhật saved source"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                updates = []
+                params = []
+                
+                if name:
+                    updates.append("name = %s")
+                    params.append(name)
+                if file_path:
+                    updates.append("file_path = %s")
+                    params.append(file_path)
+                if sheets_url:
+                    updates.append("sheets_url = %s")
+                    params.append(sheets_url)
+                
+                if not updates:
+                    return
+                
+                updates.append("updated_at = NOW()")
+                params.append(source_id)
+                
+                query = f"UPDATE saved_data_sources SET {', '.join(updates)} WHERE id = %s"
+                cursor.execute(query, params)
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                raise Exception(f"Error updating saved source: {str(e)}")
+            finally:
+                cursor.close()
+    
+    def delete_source(self, source_id: int):
+        """Xóa saved source"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                query = "DELETE FROM saved_data_sources WHERE id = %s"
+                cursor.execute(query, (source_id,))
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                raise Exception(f"Error deleting saved source: {str(e)}")
+            finally:
+                cursor.close()
+    
+    def set_active_source(self, source_id: int):
+        """Đặt source làm active (và deactivate các source khác)"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                # Deactivate all
+                cursor.execute("UPDATE saved_data_sources SET is_active = FALSE")
+                # Activate the selected one
+                cursor.execute("UPDATE saved_data_sources SET is_active = TRUE WHERE id = %s", (source_id,))
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                raise Exception(f"Error setting active source: {str(e)}")
+            finally:
+                cursor.close()

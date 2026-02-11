@@ -63,6 +63,8 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
             links = request_data.get('links', [])
             date_ranges = request_data.get('date_ranges', [])
             source = request_data.get('source', 'booking')
+            scrape_type = request_data.get('scrape_type', 'info')  # 'info' hoặc 'price'
+            market = request_data.get('market', None)
             
             if not links or not date_ranges:
                 await manager.send_personal_message({
@@ -86,10 +88,19 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
             history_repo = CrawlHistoryRepository()
             data_repo = CrawlDataRepository()
             
+            # Lấy check_in và check_out từ date_ranges đầu tiên
+            first_date_range = date_ranges[0] if date_ranges else {}
+            check_in_date = first_date_range.get('checkin')
+            check_out_date = first_date_range.get('checkout')
+            
             history_id = history_repo.create_history(
                 crawl_date=datetime.now().date(),
                 crawl_target=crawl_target,
-                source=source
+                source=source,
+                scrape_type=scrape_type,
+                market=market,
+                check_in=check_in_date,
+                check_out=check_out_date
             )
             
             await manager.send_personal_message({
@@ -147,6 +158,9 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                             }, websocket)
                         elif data:
                             if data.get('rooms') and len(data['rooms']) > 0:
+                                popular_fac_list = data.get('popular_facilities', [])
+                                popular_fac_text = ', '.join(popular_fac_list) if popular_fac_list else ''
+                                
                                 for room in data['rooms']:
                                     price_clean = room.get('price', '')
                                     if price_clean:
@@ -160,23 +174,43 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                                     bed_text = ' hoặc '.join(bed_list) if bed_list else ''
                                     facilities_list = room.get('facilities', [])
                                     facilities_text = '\n'.join(facilities_list) if facilities_list else ''
+                                    discount_pct = room.get('discount_percent', '')
                                     
-                                    results.append({
+                                    # Common fields
+                                    common_data = {
                                         'Hàng_gốc': row_num,
-                                        'Ngày cào': datetime.now().strftime('%Y-%m-%d'),
-                                        'Ngày cần cào': target_date_str,
+                                        'Giờ cào': datetime.now().strftime('%H:%M:%S'),
+                                        'Check in': checkin_date,
+                                        'Check out': checkout_date,
                                         'Tên khách sạn': data.get('hotel_name', ''),
-                                        'Link khách sạn': url,
-                                        'Giá sau giảm': price_clean,
-                                        'Giá gốc': price_orig_clean,
-                                        'Số lượng review': data.get('review_count', ''),
-                                        'Điểm review': data.get('rating', ''),
                                         'Tên hạng phòng': room.get('room_type', ''),
-                                        'Số lượng người': room.get('num_guests', ''),
-                                        'Giường': bed_text,
-                                        'Diện tích phòng': room.get('room_size', ''),
-                                        'Các lựa chọn': facilities_text
-                                    })
+                                        'Số lượng người': room.get('num_guests', '')
+                                    }
+                                    
+                                    if scrape_type == 'info':
+                                        # Cào thông tin: bao gồm tất cả thông tin chi tiết
+                                        results.append({
+                                            **common_data,
+                                            'Link khách sạn': url,
+                                            'Số lượng review': data.get('review_count', ''),
+                                            'Điểm review': data.get('rating', ''),
+                                            'Các tiện nghi được ưa chuộng nhất': popular_fac_text,
+                                            'Giường': bed_text,
+                                            'Diện tích phòng': room.get('room_size', ''),
+                                            'Các lựa chọn': facilities_text,
+                                            'Ngày cần cào': target_date_str
+                                        })
+                                    else:
+                                        # Cào giá: chỉ có thông tin về giá
+                                        results.append({
+                                            'Ngày cào': datetime.now().strftime('%Y-%m-%d'),
+                                            **common_data,
+                                            'Giá sau giảm': price_clean,
+                                            'Giá gốc': price_orig_clean,
+                                            'Giảm giá': discount_pct,
+                                            'Ngày cần cào': target_date_str,
+                                            'Link khách sạn': url
+                                        })
                                 
                                 await manager.send_personal_message({
                                     'type': 'success',

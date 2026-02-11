@@ -28,6 +28,7 @@ import Paginator from 'primevue/paginator'
 import Tag from 'primevue/tag'
 import ConfirmDialog from 'primevue/confirmdialog'
 import ConfirmationService from 'primevue/confirmationservice'
+import Tooltip from 'primevue/tooltip'
 
 const app = createApp(App)
 
@@ -43,6 +44,9 @@ app.use(PrimeVue, {
 })
 app.use(ToastService)
 app.use(ConfirmationService)
+
+// Register PrimeVue directives
+app.directive('tooltip', Tooltip)
 
 // Register PrimeVue components globally
 app.component('Button', Button)

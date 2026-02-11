@@ -1,17 +1,46 @@
 <template>
   <div class="file-uploader">
     <div class="upload-section">
-      <div class="p-field">
-        <label for="file">📂 Tải lên file Excel</label>
-        <FileUpload
-          mode="basic"
-          name="file"
-          accept=".xlsx,.xls"
-          :maxFileSize="10000000"
-          :auto="true"
-          chooseLabel="Chọn file Excel"
-          @select="handleFileSelect"
-          class="mt-2"
+      <label class="section-label">📂 Tải lên file Excel</label>
+      <FileUpload
+        ref="fileUploadRef"
+        mode="basic"
+        name="file"
+        accept=".xlsx,.xls"
+        :maxFileSize="10000000"
+        :auto="false"
+        chooseLabel="+ Chọn file Excel"
+        @select="handleFileSelect"
+        style="margin-top: 0.75rem"
+      />
+
+      <div v-if="selectedFile" class="file-info-card">
+       
+        <div class="checkbox-wrapper">
+          <Checkbox 
+            v-model="saveForReuse"
+            inputId="saveForReuse"
+            binary
+          />
+          <label for="saveForReuse" class="checkbox-label">Lưu file này để sử dụng lại sau</label>
+        </div>
+
+        <div v-if="saveForReuse" style="margin-top: 0.75rem">
+          <InputText
+            v-model="sourceName"
+            placeholder="Đặt tên cho nguồn dữ liệu này"
+            class="w-full"
+          />
+        </div>
+
+        <Button 
+          label="Tải lên và xử lý" 
+          icon="pi pi-upload"
+          class="w-full"
+          style="margin-top: 1rem"
+          @click="uploadFile"
+          :loading="uploading"
+          :disabled="uploading"
         />
       </div>
 
@@ -19,30 +48,12 @@
         <span>HOẶC</span>
       </div>
 
-      <div class="p-field">
-        <label for="url">🌐 Nhập link Google Sheets</label>
-        <div class="flex gap-2 mt-2">
-          <InputText
-            id="url"
-            v-model="googleSheetsUrl"
-            placeholder="https://docs.google.com/spreadsheets/d/..."
-            class="flex-1"
-          />
-          <Button 
-            label="Tải" 
-            icon="pi pi-download"
-            @click="handleGoogleSheets"
-            :disabled="!googleSheetsUrl || loading"
-            :loading="loading"
-          />
-        </div>
-        <small class="text-muted">Link phải ở chế độ "Anyone with the link can view"</small>
-      </div>
+      <SavedSourcesManager @source-selected="handleSourceSelected" />
     </div>
 
-    <div v-if="loading" class="loading-section">
+    <div v-if="uploading" class="loading-section">
       <ProgressBar mode="indeterminate" />
-      <p class="text-center mt-2">Đang tải dữ liệu...</p>
+      <p style="text-align: center; margin-top: 0.5rem; color: var(--text-color-secondary)">Đang xử lý file...</p>
     </div>
   </div>
 </template>
@@ -50,152 +61,155 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useToast } from 'primevue/usetoast'
-import type { LinkInfo } from '@/types'
-import * as XLSX from 'xlsx'
+import Checkbox from 'primevue/checkbox'
+import axios from 'axios'
+import SavedSourcesManager from './SavedSourcesManager.vue'
+
+interface UploadResult {
+  markets: string[]
+  links: any[]
+  total_links: number
+  source_id?: number
+}
 
 const emit = defineEmits<{
-  (e: 'links-extracted', links: LinkInfo[]): void
+  (e: 'data-loaded', data: UploadResult): void
 }>()
 
 const toast = useToast()
-const googleSheetsUrl = ref('')
-const loading = ref(false)
+const fileUploadRef = ref()
+const selectedFile = ref<File | null>(null)
+const saveForReuse = ref(false)
+const sourceName = ref('')
+const uploading = ref(false)
 
-async function handleFileSelect(event: any) {
-  const file = event.files[0]
-  if (!file) return
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-  loading.value = true
+function handleFileSelect(event: any) {
+  selectedFile.value = event.files[0] || null
+  if (selectedFile.value) {
+    sourceName.value = selectedFile.value.name.replace(/\.(xlsx|xls)$/i, '')
+  }
+}
+
+async function uploadFile() {
+  if (!selectedFile.value) return
+
+  uploading.value = true
   
   try {
-    const data = await readExcelFile(file)
-    const links = extractLinksFromData(data)
+    const formData = new FormData()
+    formData.append('file', selectedFile.value)
+    formData.append('save_for_reuse', saveForReuse.value ? 'true' : 'false')
     
-    if (links.length === 0) {
+    if (saveForReuse.value && sourceName.value) {
+      formData.append('name', sourceName.value)
+    }
+
+    const response = await axios.post(`${API_URL}/sources/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+
+    if (response.data.success) {
       toast.add({
-        severity: 'warn',
-        summary: 'Cảnh báo',
-        detail: 'Không tìm thấy link Booking.com trong file',
+        severity: 'success',
+        summary: 'Thành công',
+        detail: `Đã tải ${response.data.total_links} links từ ${response.data.markets.length} markets`,
         life: 3000
       })
-    } else {
-      emit('links-extracted', links)
+
+      emit('data-loaded', {
+        markets: response.data.markets,
+        links: response.data.links,
+        total_links: response.data.total_links,
+        source_id: response.data.source_id
+      })
+
+      // Reset form
+      selectedFile.value = null
+      saveForReuse.value = false
+      sourceName.value = ''
+      if (fileUploadRef.value) {
+        fileUploadRef.value.clear()
+      }
     }
   } catch (error: any) {
     toast.add({
       severity: 'error',
       summary: 'Lỗi',
-      detail: `Lỗi đọc file: ${error.message}`,
+      detail: error.response?.data?.detail || 'Không thể tải file lên',
       life: 5000
     })
   } finally {
-    loading.value = false
+    uploading.value = false
   }
 }
 
-async function handleGoogleSheets() {
-  if (!googleSheetsUrl.value) return
-
-  loading.value = true
+async function handleSourceSelected(sourceId: number) {
+  uploading.value = true
   
   try {
-    // TODO: Implement Google Sheets loading
+    const response = await axios.get(`${API_URL}/sources/${sourceId}`)
+    
     toast.add({
-      severity: 'warn',
-      summary: 'Chức năng',
-      detail: 'Tính năng Google Sheets đang được phát triển',
+      severity: 'success',
+      summary: 'Đã tải',
+      detail: `Đã tải ${response.data.total_links} links từ nguồn đã lưu`,
       life: 3000
+    })
+
+    emit('data-loaded', {
+      markets: response.data.markets,
+      links: response.data.links,
+      total_links: response.data.total_links,
+      source_id: sourceId
     })
   } catch (error: any) {
     toast.add({
       severity: 'error',
       summary: 'Lỗi',
-      detail: error.message,
+      detail: 'Không thể tải dữ liệu từ nguồn đã lưu',
       life: 5000
     })
   } finally {
-    loading.value = false
+    uploading.value = false
   }
 }
 
-function readExcelFile(file: File): Promise<any[][]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    
-    reader.onload = (e: any) => {
-      try {
-        const data = new Uint8Array(e.target.result)
-        const workbook = XLSX.read(data, { type: 'array' })
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
-        resolve(jsonData as any[][])
-      } catch (error) {
-        reject(error)
-      }
-    }
-    
-    reader.onerror = () => reject(reader.error)
-    reader.readAsArrayBuffer(file)
-  })
-}
-
-function extractLinksFromData(data: any[][]): LinkInfo[] {
-  const links: LinkInfo[] = []
-  
-  // Scan first 3 columns
-  for (let rowIdx = 0; rowIdx < data.length; rowIdx++) {
-    const row = data[rowIdx]
-    
-    for (let colIdx = 0; colIdx < Math.min(3, row.length); colIdx++) {
-      const cell = row[colIdx]
-      
-      if (!cell) continue
-      
-      const cellStr = String(cell).trim()
-      
-      // Check if contains booking.com link
-      if (cellStr.includes('booking.com/hotel/')) {
-        const isValid = isBookingLink(cellStr)
-        
-        links.push({
-          row: rowIdx + 1,
-          col: String.fromCharCode(65 + colIdx),
-          link: cellStr,
-          cell_value: cellStr.substring(0, 100),
-          is_valid: isValid,
-          note: isValid ? '' : '⚠️ Link không hợp lệ'
-        })
-      }
-    }
-  }
-  
-  return links
-}
-
-function isBookingLink(text: string): boolean {
-  if (!text) return false
-  const str = text.toLowerCase().trim()
-  return str.includes('booking.com/hotel/') && (str.startsWith('http://') || str.startsWith('https://'))
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 </script>
 
 <style scoped>
-.file-uploader {
-  padding: 1rem;
-}
-
-.upload-section {
-  max-width: 800px;
-}
-
-.p-field {
-  margin-bottom: 1.5rem;
-}
-
-.p-field label {
+.section-label {
+  font-weight: 600;
+  color: var(--text-color);
   display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
+}
+
+.file-info-card {
+  padding: 1rem;
+  background: var(--surface-50);
+  border: 2px solid var(--surface-200);
+  border-radius: 8px;
+}
+
+.checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checkbox-label {
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-color);
+  font-size: 0.9rem;
 }
 
 .divider {
@@ -211,36 +225,16 @@ function isBookingLink(text: string): boolean {
   left: 0;
   right: 0;
   height: 1px;
-  background: #dee2e6;
+  background: var(--surface-300);
 }
 
 .divider span {
-  background: white;
+  background: var(--surface-0);
   padding: 0 1rem;
   position: relative;
-  color: #6c757d;
+  color: var(--text-color-secondary);
   font-size: 0.875rem;
-}
-
-.flex {
-  display: flex;
-}
-
-.flex-1 {
-  flex: 1;
-}
-
-.gap-2 {
-  gap: 0.5rem;
-}
-
-.mt-2 {
-  margin-top: 0.5rem;
-}
-
-.text-muted {
-  color: #6c757d;
-  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .text-center {

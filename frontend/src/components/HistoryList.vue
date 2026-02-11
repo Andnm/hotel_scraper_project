@@ -54,6 +54,11 @@
         <DataTable 
           :value="historyStore.histories" 
           :loading="historyStore.loading"
+          :paginator="true"
+          :rows="10"
+          :rowsPerPageOptions="[10, 20, 50]"
+          paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink JumpToPageInput CurrentPageReport RowsPerPageDropdown"
+          currentPageReportTemplate="Trang {currentPage}/{totalPages} | Hiển thị {first}-{last} / {totalRecords} phiên"
           responsiveLayout="scroll"
           class="p-datatable-sm"
         >
@@ -143,6 +148,9 @@
           :value="historyStore.currentHistoryData" 
           :paginator="true"
           :rows="20"
+          :rowsPerPageOptions="[20, 50, 100]"
+          paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink JumpToPageInput CurrentPageReport RowsPerPageDropdown"
+          currentPageReportTemplate="Trang {currentPage}/{totalPages} | Hiển thị {first}-{last} / {totalRecords} dòng"
           responsiveLayout="scroll"
         >
           <Column field="hotel_name" header="Khách sạn"></Column>
@@ -158,7 +166,6 @@
     </Dialog>
 
     <Toast />
-    <ConfirmDialog />
   </div>
 </template>
 

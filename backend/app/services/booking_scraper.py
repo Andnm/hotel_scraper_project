@@ -30,40 +30,65 @@ def is_booking_link(text):
     return 'booking.com/hotel/' in text_str
 
 
-def extract_hyperlinks_from_excel(file_bytes):
+def get_markets_from_excel(file_bytes):
+    """Lấy danh sách các markets (sheet names) từ Excel file"""
     try:
         wb = openpyxl.load_workbook(BytesIO(file_bytes))
-        ws = wb.active
+        return wb.sheetnames
+    except Exception as e:
+        print(f"Lỗi khi đọc sheet names từ Excel: {str(e)}")
+        return []
+
+
+def extract_hyperlinks_from_excel(file_bytes, market=None):
+    """
+    Trích xuất links từ Excel file.
+    Nếu market=None: lấy tất cả sheets với thông tin market
+    Nếu market được chỉ định: chỉ lấy từ sheet đó
+    """
+    try:
+        wb = openpyxl.load_workbook(BytesIO(file_bytes))
         links_info = []
+        
+        # Xác định các sheets cần xử lý
+        if market:
+            # Nếu chỉ định market, chỉ xử lý sheet đó
+            sheets_to_process = [(market, wb[market])] if market in wb.sheetnames else []
+        else:
+            # Nếu không chỉ định, xử lý tất cả sheets
+            sheets_to_process = [(sheet_name, wb[sheet_name]) for sheet_name in wb.sheetnames]
+        
+        for sheet_name, ws in sheets_to_process:
+            for col_idx in [1, 2, 3]:
+                for row_idx in range(1, ws.max_row + 1):
+                    cell = ws.cell(row=row_idx, column=col_idx)
 
-        for col_idx in [1, 2, 3]:
-            for row_idx in range(1, ws.max_row + 1):
-                cell = ws.cell(row=row_idx, column=col_idx)
-
-                if cell.hyperlink and cell.hyperlink.target:
-                    link = cell.hyperlink.target
-                    is_valid = is_booking_link(link)
-                    links_info.append({
-                        'row': row_idx,
-                        'col': chr(64 + col_idx),
-                        'link': link.strip(),
-                        'cell_value': str(cell.value) if cell.value else '',
-                        'is_valid': is_valid,
-                        'note': '' if is_valid else '⚠️Link không hợp lệ'
-                    })
-
-                elif cell.value:
-                    cell_text = str(cell.value).strip()
-                    if 'http' in cell_text.lower() or 'www.' in cell_text.lower():
-                        is_valid = is_booking_link(cell_text)
+                    if cell.hyperlink and cell.hyperlink.target:
+                        link = cell.hyperlink.target
+                        is_valid = is_booking_link(link)
                         links_info.append({
                             'row': row_idx,
                             'col': chr(64 + col_idx),
-                            'link': cell_text,
-                            'cell_value': cell_text,
+                            'link': link.strip(),
+                            'cell_value': str(cell.value) if cell.value else '',
                             'is_valid': is_valid,
+                            'market': sheet_name,
                             'note': '' if is_valid else '⚠️Link không hợp lệ'
                         })
+
+                    elif cell.value:
+                        cell_text = str(cell.value).strip()
+                        if 'http' in cell_text.lower() or 'www.' in cell_text.lower():
+                            is_valid = is_booking_link(cell_text)
+                            links_info.append({
+                                'row': row_idx,
+                                'col': chr(64 + col_idx),
+                                'link': cell_text,
+                                'cell_value': cell_text,
+                                'is_valid': is_valid,
+                                'market': sheet_name,
+                                'note': '' if is_valid else '⚠️Link không hợp lệ'
+                            })
         
         return links_info
     except Exception as e:
@@ -303,16 +328,20 @@ def scrape_booking_data(url):
 
         time.sleep(5)
         
+        # Lưu HTML để debug
         try:
             page_source = driver.page_source
-            # Lưu HTML để debug - dùng thư mục temp của Windows
-            temp_dir_path = tempfile.gettempdir()
-            debug_path = os.path.join(temp_dir_path, 'booking_debug.html')
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            # Tạo thư mục debug_html trong backend
+            current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            debug_dir = os.path.join(current_dir, 'debug_html')
+            os.makedirs(debug_dir, exist_ok=True)
+            debug_path = os.path.join(debug_dir, f'booking_debug_{timestamp}.html')
             with open(debug_path, 'w', encoding='utf-8') as f:
                 f.write(page_source)
-            print(f"DEBUG: Saved HTML to {debug_path}")
+            print(f"Saved HTML to: {debug_path}")
         except Exception as e:
-            print(f"DEBUG: Could not save HTML: {e}")
+            print(f"⚠️ Could not save HTML: {e}")
 
         try:
             WebDriverWait(driver, 20).until(
@@ -327,6 +356,7 @@ def scrape_booking_data(url):
             'hotel_name': None,
             'hotel_link': forced_url,
             'scrape_date': None,
+            'popular_facilities': [],
             'rooms': [],
             'rating': None,
             'review_count': None
@@ -388,190 +418,260 @@ def scrape_booking_data(url):
                 except:
                     continue
 
+        # Lấy Các tiện nghi được ưa chuộng nhất
+        try:
+            facility_wrapper = driver.find_element(By.CSS_SELECTOR, '[data-testid="property-most-popular-facilities-wrapper"]')
+            facility_items = facility_wrapper.find_elements(By.CSS_SELECTOR, 'li span.f6b6d2a959')
+            for item in facility_items:
+                facility_text = item.text.strip()
+                if facility_text:
+                    result['popular_facilities'].append(facility_text)
+        except Exception as e:
+            pass
+
         try:
             room_rows = driver.find_elements(By.CSS_SELECTOR, 'tr.js-rt-block-row')
-            print(f"DEBUG: Found {len(room_rows)} room rows")
             
-            for idx, row in enumerate(room_rows):
+            row_index = 0
+            while row_index < len(room_rows):
+                row = room_rows[row_index]
+                
                 try:
-                    # Lưu HTML của row để debug
-                    try:
-                        row_html = row.get_attribute('outerHTML')
-                        temp_dir = tempfile.gettempdir()
-                        row_debug_path = os.path.join(temp_dir, f'booking_row_{idx}.html')
-                        with open(row_debug_path, 'w', encoding='utf-8') as f:
-                            f.write(row_html)
-                        print(f"DEBUG: Saved row {idx} HTML to {row_debug_path}")
-                    except:
-                        pass
+                    # Kiểm tra xem row có room type header không (có th.hprt-table-cell-roomtype)
+                    room_type_cell = row.find_elements(By.CSS_SELECTOR, 'th.hprt-table-cell-roomtype')
                     
-                    room_data = {
-                        'room_type': None,
-                        'price': None,
-                        'price_original': None,
-                        'num_guests': None,
-                        'bed_options': [],
-                        'room_size': None,
-                        'facilities': []
-                    }
-
-                    try:
-                        room_name = row.find_element(By.CSS_SELECTOR, '.hprt-roomtype-icon-link')
-                        room_data['room_type'] = room_name.text.strip()
-                    except:
+                    if room_type_cell:
+                        # Row này có room type header, lấy thông tin chung
+                        room_type_header = room_type_cell[0]
+                        
+                        # Lấy rowspan để biết có bao nhiêu pricing options
+                        rowspan = 1
                         try:
-                            room_name = row.find_element(By.CSS_SELECTOR, '.hprt-roomtype-link')
-                            room_data['room_type'] = room_name.text.strip()
+                            rowspan_attr = room_type_header.get_attribute('rowspan')
+                            if rowspan_attr:
+                                rowspan = int(rowspan_attr)
+                        except:
+                            rowspan = 1
+                        
+                        # Lấy thông tin chung của room (room name, guests, bed, size)
+                        room_common_data = {
+                            'room_type': None,
+                            'num_guests': None,
+                            'bed_options': [],
+                            'room_size': None,
+                            'discount_percent': None
+                        }
+                        
+                        # Lấy room name
+                        try:
+                            room_name_elem = room_type_header.find_element(By.CSS_SELECTOR, '.hprt-roomtype-link, .hprt-roomtype-icon-link')
+                            room_common_data['room_type'] = room_name_elem.text.strip()
+                        except:
+                            pass
+                        
+                        # Lấy số lượng khách - count bicon bicon-occupancy icons
+                        try:
+                            # Try new selector format first
+                            occupancy_icons = room_type_header.find_elements(By.CSS_SELECTOR, '.c-occupancy-icons__adults svg, .c-occupancy-icons__adults i')
+                            if occupancy_icons:
+                                room_common_data['num_guests'] = str(len(occupancy_icons))
+                            else:
+                                # Fallback to old selector
+                                occupancy_icons = room_type_header.find_elements(By.CSS_SELECTOR, 'span .bicon.bicon-occupancy')
+                                if occupancy_icons:
+                                    room_common_data['num_guests'] = str(len(occupancy_icons))
                         except:
                             try:
-                                room_cell = row.find_element(By.CSS_SELECTOR, 'th.hprt-table-cell-roomtype, .hprt-roomtype-name')
-                                text = room_cell.text.strip()
-                                if text:
-                                    room_data['room_type'] = text
-                                else:
-                                    continue
+                                guests_elem = room_type_header.find_element(By.CSS_SELECTOR, '.bui-u-sr-only')
+                                guests_text = guests_elem.text.strip()
+                                num_match = re.search(r'(\d+)', guests_text)
+                                if num_match:
+                                    room_common_data['num_guests'] = num_match.group(1)
                             except:
-                                continue
-                    
-                    try:
-                        num_guests_elem = row.find_element(By.CSS_SELECTOR, '.bui-u-sr-only')
-                        guests_text = num_guests_elem.text.strip()
-                        guests_match = re.search(r'(\d+)', guests_text)
-                        if guests_match:
-                            room_data['num_guests'] = guests_match.group(1)
-                    except:
-                        try:
-                            occupancy = row.find_elements(By.CSS_SELECTOR, '.bui-icon.bui-icon--adults')
-                            if occupancy:
-                                room_data['num_guests'] = str(len(occupancy))
-                        except:
-                            pass
-                    
-                    try:
-                        bed_config_elems = row.find_elements(By.CSS_SELECTOR, '.hprt-roomtype-bed')
-                        for bed_elem in bed_config_elems:
-                            bed_text = bed_elem.text.strip()
-                            if bed_text:
-                                lines = bed_text.split('\n')
-                                for line in lines:
-                                    line = line.strip()
-                                    if line and 'Chọn giường' not in line and 'tùy tình trạng' not in line:
-                                        room_data['bed_options'].append(line)
-                    except:
-                        pass
-                    
-                    try:
-                        size_elem = row.find_element(By.CSS_SELECTOR, '.hprt-roomtype-icon-info .bui-u-sr-only')
-                        size_text = size_elem.text.strip()
-                        size_match = re.search(r'(\d+)\s*m', size_text)
-                        if size_match:
-                            room_data['room_size'] = size_match.group(1) + ' m²'
-                    except:
-                        try:
-                            size_elem = row.find_element(By.XPATH, './/*[contains(text(), "m²") or contains(text(), "m2") or contains(text(), "feet²") or contains(text(), "ft²")]')
-                            size_text = size_elem.text.strip()
-
-                            size_match_m = re.search(r'(\d+)\s*m', size_text)
-                            size_match_ft = re.search(r'(\d+)\s*(feet²|ft²)', size_text)
-
-                            if size_match_m:
-                                room_data['room_size'] = size_match_m.group(1) + ' m²'
-                            elif size_match_ft:
-                                room_data['room_size'] = size_match_ft.group(1) + ' ft²'
-                        except:
-                            pass
-                    
-                    try:
-                        # Lấy các điều kiện đặt phòng (ở cột Các lựa chọn)
-                        choice_elems = row.find_elements(By.CSS_SELECTOR, '.hprt-table-cell-conditions li')
-                        print(f"DEBUG: Found {len(choice_elems)} conditions in .hprt-table-cell-conditions li")
-                        for choice in choice_elems:
-                            choice_text = choice.text.strip()
-                            print(f"DEBUG: Condition text: {choice_text}")
-                            choice_text = re.sub(r'^[•\-–—]\s*', '', choice_text)
-                            choice_text = choice_text.strip()
-                            if choice_text:
-                                room_data['facilities'].append(choice_text)
-
-                        if not room_data['facilities']:
-                            choice_elems = row.find_elements(By.CSS_SELECTOR, '.hprt-conditions li')
-                            print(f"DEBUG: Found {len(choice_elems)} conditions in .hprt-conditions li")
-                            for choice in choice_elems:
-                                choice_text = choice.text.strip()
-                                print(f"DEBUG: Condition text: {choice_text}")
-                                choice_text = re.sub(r'^[•\-–—]\s*', '', choice_text)
-                                choice_text = choice_text.strip()
-                                if choice_text:
-                                    room_data['facilities'].append(choice_text)                    
+                                try:
+                                    occupancy = room_type_header.find_elements(By.CSS_SELECTOR, '.bui-icon.bui-icon--adults')
+                                    if occupancy:
+                                        room_common_data['num_guests'] = str(len(occupancy))
+                                except:
+                                    # Try parsing from text like "Giá cho 2 người"
+                                    try:
+                                        price_text = room_type_header.text
+                                        guests_match = re.search(r'Giá cho\s*(\d+)\s*người|(\d+)\s*người', price_text, re.IGNORECASE)
+                                        if guests_match:
+                                            room_common_data['num_guests'] = guests_match.group(1) or guests_match.group(2)
+                                    except:
+                                        pass
                         
-                        print(f"DEBUG: Final facilities list: {room_data['facilities']}")
-                    except Exception as e:
-                        print(f"DEBUG: Error getting facilities: {e}")
-
-                    try:
-                        price_elem = row.find_element(By.CSS_SELECTOR, '.bui-price-display__value')
-                        price_text = price_elem.text.strip().replace('\n', ' ').replace('\xa0', ' ')
-
-                        price_match = re.search(r'VND\s*([\d\.,]+)', price_text, re.I)
-                        if not price_match:
-                            price_match = re.search(r'([\d\.,]+)\s*VND', price_text, re.I)
-
-                        if not price_match:
-                            price_match = re.search(r'([\d\.,]+)', price_text)
-
-                        if price_match:
-                            value = price_match.group(1).replace(',', '.')
-                            room_data['price'] = f"{value} {currency_code}".strip()
-                    except:
-                        pass
-
-                    if not room_data['price']:
+                        # Lấy thông tin giường
                         try:
-                            per_night_elem = row.find_element(By.CSS_SELECTOR, '.js-average-per-night-price')
-                            raw_val = per_night_elem.get_attribute('data-price-per-night-raw') or per_night_elem.text
-                            if raw_val:
-                                raw_val = str(raw_val).strip()
-                                number_match = re.search(r'([\d\.,]+)', raw_val)
-                                if number_match:
-                                    value = number_match.group(1).replace(',', '.')
-                                    room_data['price'] = f"{value} {currency_code}".strip()
+                            bed_config_elems = room_type_header.find_elements(By.CSS_SELECTOR, '.hprt-roomtype-bed')
+                            for bed_elem in bed_config_elems:
+                                bed_text = bed_elem.text.strip()
+                                if bed_text:
+                                    lines = bed_text.split('\n')
+                                    for line in lines:
+                                        line = line.strip()
+                                        if line and 'Chọn giường' not in line and 'tùy tình trạng' not in line:
+                                            room_common_data['bed_options'].append(line)
                         except:
                             pass
-
-                    try:
-                        original_price = row.find_element(By.CSS_SELECTOR, '.bui-price-display__original')
-                        orig_text = original_price.text.strip().replace('\n', ' ').replace('\xa0', ' ')
-
-                        orig_match = re.search(r'VND\s*([\d\.,]+)', orig_text, re.I)
-                        if not orig_match:
-                            orig_match = re.search(r'([\d\.,]+)\s*VND', orig_text, re.I)
-
-                        if not orig_match:
-                            orig_match = re.search(r'([\d\.,]+)', orig_text)
-
-                        if orig_match:
-                            value = orig_match.group(1).replace(',', '.')
-                            room_data['price_original'] = f"{value} {currency_code}".strip()
-                    except:
-                        pass
-
-                    if not room_data['price_original']:
+                        
+                        # Lấy diện tích phòng
                         try:
-                            orig_elem = row.find_element(By.CSS_SELECTOR, '.js-strikethrough-price')
-                            raw_orig = orig_elem.get_attribute('data-strikethrough-value') or orig_elem.text
-                            if raw_orig:
-                                raw_orig = str(raw_orig).strip()
-                                number_match = re.search(r'([\d\.,]+)', raw_orig)
-                                if number_match:
-                                    value = number_match.group(1).replace(',', '.')
-                                    room_data['price_original'] = f"{value} {currency_code}".strip()
+                            size_elem = room_type_header.find_element(By.CSS_SELECTOR, '.hprt-roomtype-icon-info .bui-u-sr-only')
+                            size_text = size_elem.text.strip()
+                            size_match = re.search(r'(\d+)\s*m', size_text)
+                            if size_match:
+                                room_common_data['room_size'] = size_match.group(1) + ' m²'
                         except:
-                            pass
+                            try:
+                                size_elem = room_type_header.find_element(By.XPATH, './/*[contains(text(), "m²") or contains(text(), "m2") or contains(text(), "feet²") or contains(text(), "ft²")]')
+                                size_text = size_elem.text.strip()
+                                size_match_m = re.search(r'(\d+)\s*m', size_text)
+                                size_match_ft = re.search(r'(\d+)\s*(feet²|ft²)', size_text)
+                                if size_match_m:
+                                    room_common_data['room_size'] = size_match_m.group(1) + ' m²'
+                                elif size_match_ft:
+                                    room_common_data['room_size'] = size_match_ft.group(1) + ' ft²'
+                            except:
+                                pass
+                        
+                        # Bây giờ lấy thông tin pricing cho từng option (rowspan lần)
+                        for option_idx in range(rowspan):
+                            pricing_row = room_rows[row_index + option_idx]
+                            
+                            room_data = {
+                                'room_type': room_common_data['room_type'],
+                                'num_guests': room_common_data['num_guests'],
+                                'bed_options': room_common_data['bed_options'].copy(),
+                                'room_size': room_common_data['room_size'],
+                                'facilities': [],
+                                'price': None,
+                                'price_original': None,
+                                'discount_percent': None
+                            }
+                            
+                            try:
+                                # Lấy facilities từ pricing row
+                                choice_elems = pricing_row.find_elements(By.CSS_SELECTOR, '.hprt-table-cell-conditions li')
+                                for choice in choice_elems:
+                                    choice_text = choice.text.strip()
+                                    choice_text = re.sub(r'^[•\-–—]\s*', '', choice_text)
+                                    choice_text = choice_text.strip()
+                                    if choice_text:
+                                        room_data['facilities'].append(choice_text)
 
-                    if room_data['room_type'] and room_data['price']:
-                        result['rooms'].append(room_data)
+                                if not room_data['facilities']:
+                                    choice_elems = pricing_row.find_elements(By.CSS_SELECTOR, '.hprt-conditions li')
+                                    for choice in choice_elems:
+                                        choice_text = choice.text.strip()
+                                        choice_text = re.sub(r'^[•\-–—]\s*', '', choice_text)
+                                        choice_text = choice_text.strip()
+                                        if choice_text:
+                                            room_data['facilities'].append(choice_text)                    
+                            except:
+                                pass
 
+                            # Lấy discount percentage (Tiết kiệm 51%)
+                            try:
+                                price_cell = pricing_row.find_element(By.CSS_SELECTOR, '.hprt-table-cell-price, [data-testid="price-and-discounted-price"]')
+                                discount_text = price_cell.text
+                                discount_match = re.search(r'Ti[ếe]t ki[ệe]m\s+\d+%', discount_text, re.IGNORECASE)
+                                if discount_match:
+                                    room_data['discount_percent'] = discount_match.group(0)
+                            except:
+                                pass
+
+                            # Lấy giá
+                            price_selectors = [
+                                '.bui-price-display__value',
+                                '[data-testid="price-and-discounted-price"] .prco-valign-middle-helper',
+                                '.prco-inline-block-maker-helper',
+                                '.bui_font_strong',
+                                '.prco-text-color-bold',
+                                'span[aria-hidden="true"]'
+                            ]
+                            
+                            for selector in price_selectors:
+                                try:
+                                    price_elem = pricing_row.find_element(By.CSS_SELECTOR, selector)
+                                    price_text = price_elem.text.strip().replace('\n', ' ').replace('\xa0', ' ')
+                                    if price_text and len(price_text) > 0:
+                                        price_match = re.search(r'VND\s*([\d\.,]+)', price_text, re.I)
+                                        if not price_match:
+                                            price_match = re.search(r'([\d\.,]+)\s*VND', price_text, re.I)
+                                        if not price_match:
+                                            price_match = re.search(r'([\d\.,]+)', price_text)
+                                        if price_match:
+                                            value = price_match.group(1).replace(',', '.')
+                                            room_data['price'] = f"{value} {currency_code}".strip()
+                                            break
+                                except:
+                                    continue
+
+                            if not room_data['price']:
+                                try:
+                                    per_night_elem = pricing_row.find_element(By.CSS_SELECTOR, '.js-average-per-night-price')
+                                    raw_val = per_night_elem.get_attribute('data-price-per-night-raw') or per_night_elem.text
+                                    if raw_val:
+                                        raw_val = str(raw_val).strip()
+                                        number_match = re.search(r'([\d\.,]+)', raw_val)
+                                        if number_match:
+                                            value = number_match.group(1).replace(',', '.')
+                                            room_data['price'] = f"{value} {currency_code}".strip()
+                                except:
+                                    pass
+
+                            # Lấy giá gốc
+                            original_price_selectors = [
+                                '.bui-price-display__original',
+                                '.bui-price-display__strikethrough',
+                                '[data-testid="price-and-discounted-price"] .bui-price-display__strikethrough',
+                                '.prco-text-stack s'
+                            ]
+                            
+                            for selector in original_price_selectors:
+                                try:
+                                    original_price = pricing_row.find_element(By.CSS_SELECTOR, selector)
+                                    orig_text = original_price.text.strip().replace('\n', ' ').replace('\xa0', ' ')
+                                    if orig_text and len(orig_text) > 0:
+                                        orig_match = re.search(r'VND\s*([\d\.,]+)', orig_text, re.I)
+                                        if not orig_match:
+                                            orig_match = re.search(r'([\d\.,]+)\s*VND', orig_text, re.I)
+                                        if not orig_match:
+                                            orig_match = re.search(r'([\d\.,]+)', orig_text)
+                                        if orig_match:
+                                            value = orig_match.group(1).replace(',', '.')
+                                            room_data['price_original'] = f"{value} {currency_code}".strip()
+                                            break
+                                except:
+                                    continue
+
+                            if not room_data['price_original']:
+                                try:
+                                    orig_elem = pricing_row.find_element(By.CSS_SELECTOR, '.js-strikethrough-price')
+                                    raw_orig = orig_elem.get_attribute('data-strikethrough-value') or orig_elem.text
+                                    if raw_orig:
+                                        raw_orig = str(raw_orig).strip()
+                                        number_match = re.search(r'([\d\.,]+)', raw_orig)
+                                        if number_match:
+                                            value = number_match.group(1).replace(',', '.')
+                                            room_data['price_original'] = f"{value} {currency_code}".strip()
+                                except:
+                                    pass
+
+                            # Thêm room data vào result
+                            if room_data['room_type'] and room_data['price']:
+                                result['rooms'].append(room_data)
+                        
+                        # Tăng row_index để skip các pricing rows đã xử lý
+                        row_index += rowspan
+                    else:
+                        # Row này không có room type header -> bỏ qua (đã được xử lý trong rowspan loop trước đó)
+                        row_index += 1
+                        
                 except Exception as e:
+                    row_index += 1
                     continue
         except Exception as e:
             pass

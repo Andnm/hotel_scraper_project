@@ -28,6 +28,7 @@ export interface LinkInfo {
   link: string
   cell_value: string
   is_valid: boolean
+  market: string
   note?: string
   status?: string
 }
@@ -41,6 +42,8 @@ export interface ScrapeRequest {
   links: LinkInfo[]
   date_ranges: DateRange[]
   source: string
+  scrape_type?: 'info' | 'price'
+  market?: string | null
 }
 
 export interface ScrapeProgress {
