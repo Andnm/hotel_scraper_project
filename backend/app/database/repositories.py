@@ -173,7 +173,7 @@ class CrawlHistoryRepository:
             finally:
                 cursor.close()
 
-    def get_latest_history(self, source: Optional[str] = None) -> Optional[Dict]:
+    def get_latest_history(self, source: Optional[str] = None, scrape_type: Optional[str] = None) -> Optional[Dict]:
         with get_db_connection() as conn:
             cursor = conn.cursor(dictionary=True)
             try:
@@ -183,6 +183,10 @@ class CrawlHistoryRepository:
                 if source:
                     query += " AND source = %s"
                     params.append(source.lower())
+
+                if scrape_type and scrape_type.lower() != 'all':
+                    query += " AND scrape_type = %s"
+                    params.append(scrape_type.lower())
 
                 query += " ORDER BY created_at DESC LIMIT 1"
 

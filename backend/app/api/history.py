@@ -134,6 +134,87 @@ async def export_history_data(history_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/public/history/{history_id}")
+async def get_history_public_data(history_id: int):
+    """
+    Public API to get data for a specific history record, formatted exactly like the Excel export.
+    Useful for PowerBI integration.
+    """
+    try:
+        data_repo = CrawlDataRepository()
+        history_repo = CrawlHistoryRepository()
+        
+        # Get history info to know scrape_type
+        history = history_repo.get_history_by_id(history_id)
+        if not history:
+            raise HTTPException(status_code=404, detail="History not found")
+            
+        scrape_type = history.get('scrape_type', 'info')
+        # Reuse export logic which gets all raw data
+        records = data_repo.export_data_by_history(history_id)
+        
+        formatted_records = []
+        for record in records:
+            options = record.get('options', {})
+            if isinstance(options, str):
+                options = json.loads(options) if options else {}
+            
+            # Common fields logic
+            base_record = {
+                'Ngày cào': record['crawl_date'].isoformat() if record.get('crawl_date') else 'N/A',
+                'Giờ cào': record['created_at'].strftime('%H:%M:%S') if record.get('created_at') else record.get('crawl_time', 'N/A'),
+                'Check in': record['check_in'].isoformat() if record.get('check_in') else 'N/A',
+                'Check out': record['check_out'].isoformat() if record.get('check_out') else 'N/A',
+                'Tên khách sạn': record.get('hotel_name') or 'N/A',
+            }
+
+            if scrape_type == 'info':
+                # Info-specific columns
+                formatted_records.append({
+                    **base_record,
+                    'Link khách sạn': record.get('hotel_link') or 'N/A',
+                    'Số lượng review': record.get('review_count') if record.get('review_count') else 'N/A',
+                    'Điểm review': record.get('review_score') if record.get('review_score') else 'N/A',
+                    'Các tiện nghi được ưa chuộng nhất': record.get('popular_facilities') or 'N/A',
+                    'Tên hạng phòng': record.get('room_type') or 'N/A',
+                    'Số lượng người': record.get('num_people') if record.get('num_people') else 'N/A',
+                    'Giường': record.get('bed_info') or 'N/A',
+                    'Diện tích phòng': record.get('room_area') or 'N/A',
+                    'Các lựa chọn': options.get('facilities', 'N/A')
+                })
+            else:
+                # Price-specific columns
+                formatted_records.append({
+                    **base_record,
+                    'Tên hạng phòng': record.get('room_type') or 'N/A',
+                    'Số lượng người': record.get('num_people') if record.get('num_people') else 'N/A',
+                    'Giá sau giảm': record.get('price_after_discount') if record.get('price_after_discount') else 'N/A',
+                    'Giá gốc': record.get('price_original') if record.get('price_original') else 'N/A',
+                    'Giảm giá': record.get('discount_percent') or 'N/A',
+                })
+        
+        return formatted_records
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/public/latest")
+async def get_latest_public_data(scrape_type: str = Query(..., regex="^(info|price)$")):
+    """
+    Public API to get the LATEST data for a specific scrape type.
+    """
+    try:
+        history_repo = CrawlHistoryRepository()
+        
+        # Get latest history for this type
+        latest_history = history_repo.get_latest_history(scrape_type=scrape_type)
+        
+        if not latest_history:
+            return []
+            
+        return await get_history_public_data(latest_history['id'])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/api")
 async def get_api_data(
     mode: str = Query("latest", regex="^(latest|all|filter)$"),
