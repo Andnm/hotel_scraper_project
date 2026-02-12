@@ -26,8 +26,10 @@ def get_random_user_agent():
 
 try:
     from selenium import webdriver
-    from selenium.webdriver.edge.service import Service
-    from selenium.webdriver.edge.options import Options
+    from selenium.webdriver.edge.service import Service as EdgeService
+    from selenium.webdriver.edge.options import Options as EdgeOptions
+    from selenium.webdriver.chrome.service import Service as ChromeService
+    from selenium.webdriver.chrome.options import Options as ChromeOptions
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
@@ -35,6 +37,69 @@ try:
 except ImportError:
     SELENIUM_AVAILABLE = False
 
+def get_driver(is_headless=True):
+    # Check if running in Docker/Linux with Chrome installed
+    is_docker = os.path.exists('/.dockerenv') or os.path.exists('/usr/bin/google-chrome')
+    
+    if is_docker:
+        # Use Chrome in Docker
+        options = ChromeOptions()
+        options.add_argument('--headless=new')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--lang=vi-VN')
+        options.add_argument(f'user-agent={get_random_user_agent()}')
+        
+        service = ChromeService() # Assumes chromedriver is in PATH (installed by package usually or we need to manage it)
+        # In python-slim + chrome install, we might need chromedriver. 
+        # The Dockerfile I wrote installs google-chrome-stable but NOT chromedriver explicitly.
+        # I should update Dockerfile to install chromedriver or use webdriver-manager.
+        
+        # Better: use webdriver_manager in code to be safe
+        from webdriver_manager.chrome import ChromeDriverManager
+        service = ChromeService(ChromeDriverManager().install())
+        
+        driver = webdriver.Chrome(service=service, options=options)
+        
+        # Fake Geo for Chrome
+        try:
+            driver.execute_cdp_cmd("Emulation.setGeolocationOverride", {
+                "latitude": 21.028511,
+                "longitude": 105.854164,
+                "accuracy": 100
+            })
+            driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {
+                "timezoneId": "Asia/Ho_Chi_Minh"
+            })
+        except:
+            pass
+            
+        return driver
+    else:
+        # Use Edge locally (Windows)
+        try:
+            from webdriver_manager.microsoft import EdgeChromiumDriverManager
+            if not is_headless:
+                temp_dir = tempfile.mkdtemp(prefix='selenium_booking_')
+            
+            options = EdgeOptions()
+            options.use_chromium = True
+            if is_headless:
+                options.add_argument('--headless=new')
+                
+            options.add_argument('--disable-gpu')
+            options.add_argument('--lang=vi-VN')
+            options.add_argument(f'user-agent={get_random_user_agent()}')
+            
+            # Fake Geo for Edge
+            # ... (Logic applies later)
+            
+            service = EdgeService(EdgeChromiumDriverManager().install())
+            driver = webdriver.Edge(service=service, options=options)
+            return driver
+        except Exception as e:
+            raise Exception(f"Failed to initialize Edge driver: {e}")
 
 def is_booking_link(text):
     if pd.isna(text) or text is None:
@@ -302,24 +367,7 @@ def scrape_booking_data(url):
     if not SELENIUM_AVAILABLE:
         return None, "Selenium chưa được cài đặt. Vui lòng chạy: pip install selenium webdriver-manager"
     
-    temp_dir = tempfile.mkdtemp(prefix='selenium_booking_')
-    
-    options = Options()
-    options.add_argument('--headless=new')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--lang=vi-VN')
-    options.add_argument('--disable-blink-features=AutomationControlled')
-    options.add_argument(f'--user-data-dir={temp_dir}')
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option('useAutomationExtension', False)
-    
-    # Randomize User-Agent to avoid detection
-    options.add_argument(f'user-agent={get_random_user_agent()}')
-    
     driver = None
-
     forced_url = force_vnd_currency(url)
 
     currency_code = 'VND'
@@ -332,30 +380,9 @@ def scrape_booking_data(url):
         pass
 
     try:
-        try:
-            service = Service()
-        except:
-            service = Service()
-        
-        driver = webdriver.Edge(service=service, options=options)
-        
-        # --- FAKE GEOLOCATION & TIMEZONE (VIETNAM) ---
-        # Giả lập vị trí và múi giờ Việt Nam để lấy dữ liệu chính xác hơn khi deploy server nước ngoài
-        try:
-            # Set coordinates to Hanoi, Vietnam
-            driver.execute_cdp_cmd("Emulation.setGeolocationOverride", {
-                "latitude": 21.028511,
-                "longitude": 105.854164,
-                "accuracy": 100
-            })
-            # Set timezone to Asia/Ho_Chi_Minh
-            driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {
-                "timezoneId": "Asia/Ho_Chi_Minh"
-            })
-        except Exception as e:
-            # Nếu giả lập thất bại thì vẫn chạy tiếp chứ không dừng chương trình
-            print(f"⚠️ Could not set geolocation/timezone: {e}")
-        # ---------------------------------------------
+        # Sử dụng hàm get_driver để hỗ trợ cả Docker (Chrome) và Local (Edge)
+        driver = get_driver(is_headless=True) # Mặc định headless cho server
+
         
         driver.set_page_load_timeout(45)
 

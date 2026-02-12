@@ -7,6 +7,7 @@ from io import BytesIO, StringIO
 import time
 import openpyxl
 import json
+from app.services.booking_scraper import get_driver
 
 try:
     from selenium import webdriver
@@ -239,39 +240,13 @@ def scrape_agoda_data(url):
     except:
         pass
     
-    options = Options()
-    options.add_argument('--headless=new')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option('useAutomationExtension', False)
-    options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
-    
     driver = None
 
     try:
-        service = Service()
-        driver = webdriver.Edge(service=service, options=options)
-        
-        # --- FAKE GEOLOCATION & TIMEZONE (VIETNAM) ---
-        # Giả lập vị trí và múi giờ Việt Nam
-        try:
-            # Set coordinates to Hanoi, Vietnam
-            driver.execute_cdp_cmd("Emulation.setGeolocationOverride", {
-                "latitude": 21.028511,
-                "longitude": 105.854164,
-                "accuracy": 100
-            })
-            # Set timezone to Asia/Ho_Chi_Minh
-            driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {
-                "timezoneId": "Asia/Ho_Chi_Minh"
-            })
-        except Exception as e:
-            print(f"⚠️ Could not set geolocation/timezone: {e}")
-        # ---------------------------------------------
-
+        driver = get_driver(is_headless=True)
         driver.set_page_load_timeout(45)
+        
+        # Retry logic for page load (Phase 1: Immediate Retry)
         
         # Retry logic for page load (Phase 1: Immediate Retry)
         max_retries = 3
