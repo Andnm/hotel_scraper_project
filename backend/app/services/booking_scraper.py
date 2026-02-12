@@ -51,6 +51,33 @@ def get_driver(is_headless=True):
         options.add_argument('--lang=vi-VN')
         options.add_argument(f'user-agent={get_random_user_agent()}')
         
+        # Anti-detection arguments
+        options.add_argument('--disable-blink-features=AutomationControlled')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-extensions')
+        options.add_argument('--no-first-run')
+        options.add_argument('--disable-web-security')
+        options.add_argument('--disable-features=VizDisplayCompositor')
+        options.add_argument('--disable-webrtc')
+        options.add_argument('--disable-webrtc-hw-decoding')
+        options.add_argument('--disable-webrtc-hw-encoding')
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option('useAutomationExtension', False)
+        
+        # Location and language preferences + IP masking
+        prefs = {
+            "profile.default_content_setting_values.geolocation": 1,
+            "profile.managed_default_content_settings.geolocation": 1,
+            "profile.content_settings.exceptions.geolocation": {
+                "*": {"setting": 1}
+            },
+            "intl.accept_languages": "vi-VN,vi,en",
+            "profile.default_content_settings.popups": 0,
+            "profile.default_content_setting_values.media_stream": 2,
+            "profile.default_content_setting_values.webrtc_ip_handling_policy": "default_public_interface_only"
+        }
+        options.add_experimental_option("prefs", prefs)
+        
         service = ChromeService() # Assumes chromedriver is in PATH (installed by package usually or we need to manage it)
         # In python-slim + chrome install, we might need chromedriver. 
         # The Dockerfile I wrote installs google-chrome-stable but NOT chromedriver explicitly.
@@ -62,17 +89,118 @@ def get_driver(is_headless=True):
         
         driver = webdriver.Chrome(service=service, options=options)
         
-        # Fake Geo for Chrome
+        # Remove automation indicators
+        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        
+        # Block WebRTC IP leak
+        driver.execute_cdp_cmd('Network.setUserAgentOverride', {
+            "userAgent": get_random_user_agent(),
+            "acceptLanguage": "vi-VN,vi;q=0.9,en;q=0.8",
+            "platform": "Win32"
+        })
+        
+        # Enhanced GPS spoofing for Chrome (Vietnam only)
         try:
+            # Disable WebRTC to prevent IP leak
+            driver.execute_cdp_cmd('Network.setUserAgentOverride', {
+                "userAgent": get_random_user_agent(),
+                "acceptLanguage": "vi-VN,vi;q=0.9,en;q=0.8",
+                "platform": "Win32"
+            })
+            
+            # Set geolocation to Vietnam
             driver.execute_cdp_cmd("Emulation.setGeolocationOverride", {
                 "latitude": 21.028511,
                 "longitude": 105.854164,
                 "accuracy": 100
             })
+            
+            # Set timezone to Vietnam
             driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {
                 "timezoneId": "Asia/Ho_Chi_Minh"
             })
-        except:
+            
+            # Set locale to Vietnamese
+            driver.execute_cdp_cmd("Emulation.setLocaleOverride", {
+                "locale": "vi-VN"
+            })
+            
+            # Set proper Vietnamese user agent and headers
+            driver.execute_cdp_cmd("Network.setUserAgentOverride", {
+                "userAgent": get_random_user_agent(),
+                "acceptLanguage": "vi-VN,vi;q=0.9,en;q=0.8",
+                "platform": "Win32"
+            })
+            
+            # Additional location override via JavaScript + WebRTC blocking
+            location_script = """
+            // Override geolocation
+            navigator.geolocation.getCurrentPosition = function(success, error, options) {
+                success({
+                    coords: {
+                        latitude: 21.028511,
+                        longitude: 105.854164,
+                        accuracy: 100,
+                        altitude: null,
+                        altitudeAccuracy: null,
+                        heading: null,
+                        speed: null
+                    },
+                    timestamp: Date.now()
+                });
+            };
+            
+            // Block WebRTC IP leak
+            if (window.RTCPeerConnection) {
+                window.RTCPeerConnection = function() {
+                    throw new Error('WebRTC blocked for privacy');
+                };
+            }
+            if (window.webkitRTCPeerConnection) {
+                window.webkitRTCPeerConnection = function() {
+                    throw new Error('WebRTC blocked for privacy');
+                };
+            }
+            if (window.mozRTCPeerConnection) {
+                window.mozRTCPeerConnection = function() {
+                    throw new Error('WebRTC blocked for privacy');
+                };
+            }
+            
+            // Override timezone and language detection
+            Object.defineProperty(navigator, 'language', {get: () => 'vi-VN'});
+            Object.defineProperty(navigator, 'languages', {get: () => ['vi-VN', 'vi', 'en']});
+            
+            // Override timezone
+            if (Intl && Intl.DateTimeFormat) {
+                const originalResolvedOptions = Intl.DateTimeFormat.prototype.resolvedOptions;
+                Intl.DateTimeFormat.prototype.resolvedOptions = function() {
+                    const options = originalResolvedOptions.call(this);
+                    options.timeZone = 'Asia/Ho_Chi_Minh';
+                    options.locale = 'vi-VN';
+                    return options;
+                };
+            }
+            
+            // Mock Vietnamese IP address detection
+            Object.defineProperty(window, '__IP_LOCATION__', {
+                value: {
+                    country: 'VN',
+                    countryCode: 'VN', 
+                    region: 'HN',
+                    city: 'Hanoi',
+                    timezone: 'Asia/Ho_Chi_Minh',
+                    currency: 'VND'
+                },
+                writable: false
+            });
+            """
+            driver.execute_script(location_script)
+            
+            # Wait for settings to apply
+            time.sleep(2)
+            
+        except Exception as e:
             pass
             
         return driver
@@ -92,11 +220,76 @@ def get_driver(is_headless=True):
             options.add_argument('--lang=vi-VN')
             options.add_argument(f'user-agent={get_random_user_agent()}')
             
-            # Fake Geo for Edge
-            # ... (Logic applies later)
+            # Enhanced GPS spoofing for Edge
+            options.add_argument('--disable-blink-features=AutomationControlled')
+            options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            options.add_experimental_option('useAutomationExtension', False)
+            options.add_argument('--disable-web-security')
+            options.add_argument('--allow-running-insecure-content')
+            
+            # Fake geolocation via prefs (Edge/Chromium)
+            prefs = {
+                "profile.default_content_setting_values.geolocation": 1,
+                "profile.managed_default_content_settings.geolocation": 1,
+                "profile.default_content_settings.geolocation": 1,
+                "intl.accept_languages": "vi-VN,vi,en-US,en"
+            }
+            options.add_experimental_option("prefs", prefs)
             
             service = EdgeService(EdgeChromiumDriverManager().install())
             driver = webdriver.Edge(service=service, options=options)
+            
+            # Remove automation indicators
+            driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            
+            # Apply GPS spoofing for Edge (Vietnam only)
+            try:
+                
+                driver.execute_cdp_cmd("Emulation.setGeolocationOverride", {
+                    "latitude": 21.028511,
+                    "longitude": 105.854164,
+                    "accuracy": 100
+                })
+                
+                driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {
+                    "timezoneId": "Asia/Ho_Chi_Minh"
+                })
+                
+                driver.execute_cdp_cmd("Emulation.setLocaleOverride", {
+                    "locale": "vi-VN"
+                })
+                
+                driver.execute_cdp_cmd("Network.setUserAgentOverride", {
+                    "userAgent": get_random_user_agent(),
+                    "acceptLanguage": "vi-VN,vi;q=0.9,en;q=0.8",
+                    "platform": "Win32"
+                })
+                
+                # Additional location override via JavaScript
+                location_script = """
+                navigator.geolocation.getCurrentPosition = function(success, error, options) {
+                    success({
+                        coords: {
+                            latitude: 21.028511,
+                            longitude: 105.854164,
+                            accuracy: 100,
+                            altitude: null,
+                            altitudeAccuracy: null,
+                            heading: null,
+                            speed: null
+                        },
+                        timestamp: Date.now()
+                    });
+                };
+                """
+                driver.execute_script(location_script)
+                
+                # Wait for settings to apply
+                time.sleep(2)
+                
+            except Exception as e:
+                pass
+            
             return driver
         except Exception as e:
             raise Exception(f"Failed to initialize Edge driver: {e}")
@@ -217,7 +410,6 @@ def find_booking_links(df):
 
 
 def force_vnd_currency(url):
-
     try:
         parsed = urlparse(str(url))
         query = parse_qs(parsed.query)
@@ -380,8 +572,8 @@ def scrape_booking_data(url):
         pass
 
     try:
-        # Sử dụng hàm get_driver để hỗ trợ cả Docker (Chrome) và Local (Edge)
-        driver = get_driver(is_headless=True) # Mặc định headless cho server
+        # Sử dụng hàm get_driver để hỗ trợ cả Docker (Chrome) và Local (Edge) 
+        driver = get_driver(is_headless=True)
 
         
         driver.set_page_load_timeout(45)
@@ -393,6 +585,45 @@ def scrape_booking_data(url):
             try:
                 # print(f"Loading URL (Attempt {attempt+1}/{max_retries}): {forced_url}")
                 driver.get(forced_url)
+                
+                # Apply GPS spoofing and verify on first attempt
+                if attempt == 0:
+                    # Add Vietnamese cookies
+                    try:
+                        vietnamese_cookies = [
+                            {'name': 'booked_before', 'value': '1'},
+                            {'name': 'currency', 'value': 'VND'}, 
+                            {'name': 'language', 'value': 'vi'},
+                            {'name': 'country', 'value': 'vn'},
+                            {'name': 'market_country', 'value': 'vn'},
+                            {'name': 'detected_country', 'value': 'vn'},
+                            {'name': 'timezone', 'value': 'Asia/Ho_Chi_Minh'},
+                        ]
+                        
+                        for cookie in vietnamese_cookies:
+                            try:
+                                driver.add_cookie(cookie)
+                            except:
+                                pass
+                    except Exception as e:
+                        pass
+                    
+                # Additional Vietnamese location hints
+                try:
+                    driver.execute_script("""
+                        // Override timezone
+                        if (Intl && Intl.DateTimeFormat) {
+                            Intl.DateTimeFormat = function(locale, options) {
+                                return new (Intl.DateTimeFormat.bind(Intl.DateTimeFormat, 'vi-VN', options))();
+                            };
+                        }
+                        
+                        // Override navigator language
+                        Object.defineProperty(navigator, 'language', {get: () => 'vi-VN'});
+                        Object.defineProperty(navigator, 'languages', {get: () => ['vi-VN', 'vi', 'en']});
+                    """) 
+                except:
+                    pass
                 
                 # Check for successful load
                 WebDriverWait(driver, 20).until(
@@ -406,7 +637,18 @@ def scrape_booking_data(url):
                 # If last attempt fails, loop will finish and code proceeds below
                 # potentially leading to empty result or further error which is caught by caller
 
-        time.sleep(5)
+        time.sleep(random.uniform(2, 4))
+        
+        # Force Vietnamese currency if not already set
+        try:
+            current_url = driver.current_url
+            if 'selected_currency=VND' not in current_url:
+                vnd_url = force_vnd_currency(current_url)
+                if vnd_url != current_url:
+                    driver.get(vnd_url)
+                    time.sleep(2)
+        except Exception as e:
+            pass
         
         try:
             WebDriverWait(driver, 20).until(
@@ -757,7 +999,7 @@ def scrape_booking_data(url):
         except Exception as e:
             pass
         
-        return result, None
+return result, None
         
     except Exception as e:
         return None, f"Lỗi: {str(e)}"
