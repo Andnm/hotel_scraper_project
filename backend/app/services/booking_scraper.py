@@ -408,21 +408,6 @@ def scrape_booking_data(url):
 
         time.sleep(5)
         
-        # Lưu HTML để debug
-        try:
-            page_source = driver.page_source
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            # Tạo thư mục debug_html trong backend
-            current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            debug_dir = os.path.join(current_dir, 'debug_html')
-            os.makedirs(debug_dir, exist_ok=True)
-            debug_path = os.path.join(debug_dir, f'booking_debug_{timestamp}.html')
-            with open(debug_path, 'w', encoding='utf-8') as f:
-                f.write(page_source)
-            print(f"Saved HTML to: {debug_path}")
-        except Exception as e:
-            print(f"⚠️ Could not save HTML: {e}")
-
         try:
             WebDriverWait(driver, 20).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, 'h2.pp-header__title, h1, [data-testid="price-and-discounted-price"]'))

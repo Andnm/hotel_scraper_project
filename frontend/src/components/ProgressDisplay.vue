@@ -26,7 +26,7 @@
             <i class="pi pi-building"></i>
             <span>Đang cào</span>
           </div>
-          <div class="status-value">{{ scraperStore.currentHotelName || 'Đang khởi động...' }}</div>
+          <div class="status-value" :title="scraperStore.currentHotelName">{{ truncateText(scraperStore.currentHotelName || 'Đang khởi động...', 50) }}</div>
         </div>
 
         <div class="status-item">
@@ -90,6 +90,11 @@
 import { useScraperStore } from '@/stores/scraper'
 
 const scraperStore = useScraperStore()
+
+const truncateText = (text: string, maxLength: number) => {
+  if (!text) return text
+  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
+}
 </script>
 
 <style scoped>
