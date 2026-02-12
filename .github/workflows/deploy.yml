@@ -32,8 +32,8 @@ jobs:
           script: |
             cd /root/hotel_scraper_project
             
-            # Tạo file .env cho backend và db
-            echo "${{ secrets.ENV_FILE }}" > ./backend/.env
+            # Tạo file .env ở thư mục gốc để docker-compose đọc được biến ${...}
+            echo "${{ secrets.ENV_FILE }}" > .env
             
             # Stop & Remove old containers to force recreate
             docker-compose down

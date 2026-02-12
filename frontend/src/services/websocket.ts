@@ -85,5 +85,19 @@ export class WebSocketService {
   }
 }
 
-const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
-export const scraperWebSocket = new WebSocketService(`${wsUrl}/ws/scrape`)
+// Auto-detect WebSocket URL if not provided in env
+function getWebSocketUrl() {
+  const envUrl = import.meta.env.VITE_WS_URL
+  if (envUrl) return envUrl
+
+  // If running in browser, construct WS URL from current location
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const host = window.location.host
+  return `${protocol}//${host}`
+}
+
+const wsUrl = getWebSocketUrl()
+// Remove trailing slash if present to avoid double slashes
+const cleanWsUrl = wsUrl.endsWith('/') ? wsUrl.slice(0, -1) : wsUrl
+
+export const scraperWebSocket = new WebSocketService(`${cleanWsUrl}/ws/scrape`)
