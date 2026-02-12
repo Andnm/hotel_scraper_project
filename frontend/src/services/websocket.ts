@@ -97,7 +97,6 @@ function getWebSocketUrl() {
 }
 
 const wsUrl = getWebSocketUrl()
-// Remove trailing slash if present to avoid double slashes
 const cleanWsUrl = wsUrl.endsWith('/') ? wsUrl.slice(0, -1) : wsUrl
 
 export const scraperWebSocket = new WebSocketService(`${cleanWsUrl}/ws/scrape`)
