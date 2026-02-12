@@ -58,13 +58,10 @@ def get_driver(is_headless=True):
         options.add_argument('--no-first-run')
         options.add_argument('--disable-web-security')
         options.add_argument('--disable-features=VizDisplayCompositor')
-        options.add_argument('--disable-webrtc')
-        options.add_argument('--disable-webrtc-hw-decoding')
-        options.add_argument('--disable-webrtc-hw-encoding')
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option('useAutomationExtension', False)
         
-        # Location and language preferences + IP masking
+        # Location and language preferences
         prefs = {
             "profile.default_content_setting_values.geolocation": 1,
             "profile.managed_default_content_settings.geolocation": 1,
@@ -72,16 +69,9 @@ def get_driver(is_headless=True):
                 "*": {"setting": 1}
             },
             "intl.accept_languages": "vi-VN,vi,en",
-            "profile.default_content_settings.popups": 0,
-            "profile.default_content_setting_values.media_stream": 2,
-            "profile.default_content_setting_values.webrtc_ip_handling_policy": "default_public_interface_only"
+            "profile.default_content_settings.popups": 0
         }
         options.add_experimental_option("prefs", prefs)
-        
-        service = ChromeService() # Assumes chromedriver is in PATH (installed by package usually or we need to manage it)
-        # In python-slim + chrome install, we might need chromedriver. 
-        # The Dockerfile I wrote installs google-chrome-stable but NOT chromedriver explicitly.
-        # I should update Dockerfile to install chromedriver or use webdriver-manager.
         
         # Better: use webdriver_manager in code to be safe
         from webdriver_manager.chrome import ChromeDriverManager
@@ -92,22 +82,8 @@ def get_driver(is_headless=True):
         # Remove automation indicators
         driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         
-        # Block WebRTC IP leak
-        driver.execute_cdp_cmd('Network.setUserAgentOverride', {
-            "userAgent": get_random_user_agent(),
-            "acceptLanguage": "vi-VN,vi;q=0.9,en;q=0.8",
-            "platform": "Win32"
-        })
-        
-        # Enhanced GPS spoofing for Chrome (Vietnam only)
+        # Setup location override (GPS spoofing only)
         try:
-            # Disable WebRTC to prevent IP leak
-            driver.execute_cdp_cmd('Network.setUserAgentOverride', {
-                "userAgent": get_random_user_agent(),
-                "acceptLanguage": "vi-VN,vi;q=0.9,en;q=0.8",
-                "platform": "Win32"
-            })
-            
             # Set geolocation to Vietnam
             driver.execute_cdp_cmd("Emulation.setGeolocationOverride", {
                 "latitude": 21.028511,
@@ -124,81 +100,6 @@ def get_driver(is_headless=True):
             driver.execute_cdp_cmd("Emulation.setLocaleOverride", {
                 "locale": "vi-VN"
             })
-            
-            # Set proper Vietnamese user agent and headers
-            driver.execute_cdp_cmd("Network.setUserAgentOverride", {
-                "userAgent": get_random_user_agent(),
-                "acceptLanguage": "vi-VN,vi;q=0.9,en;q=0.8",
-                "platform": "Win32"
-            })
-            
-            # Additional location override via JavaScript + WebRTC blocking
-            location_script = """
-            // Override geolocation
-            navigator.geolocation.getCurrentPosition = function(success, error, options) {
-                success({
-                    coords: {
-                        latitude: 21.028511,
-                        longitude: 105.854164,
-                        accuracy: 100,
-                        altitude: null,
-                        altitudeAccuracy: null,
-                        heading: null,
-                        speed: null
-                    },
-                    timestamp: Date.now()
-                });
-            };
-            
-            // Block WebRTC IP leak
-            if (window.RTCPeerConnection) {
-                window.RTCPeerConnection = function() {
-                    throw new Error('WebRTC blocked for privacy');
-                };
-            }
-            if (window.webkitRTCPeerConnection) {
-                window.webkitRTCPeerConnection = function() {
-                    throw new Error('WebRTC blocked for privacy');
-                };
-            }
-            if (window.mozRTCPeerConnection) {
-                window.mozRTCPeerConnection = function() {
-                    throw new Error('WebRTC blocked for privacy');
-                };
-            }
-            
-            // Override timezone and language detection
-            Object.defineProperty(navigator, 'language', {get: () => 'vi-VN'});
-            Object.defineProperty(navigator, 'languages', {get: () => ['vi-VN', 'vi', 'en']});
-            
-            // Override timezone
-            if (Intl && Intl.DateTimeFormat) {
-                const originalResolvedOptions = Intl.DateTimeFormat.prototype.resolvedOptions;
-                Intl.DateTimeFormat.prototype.resolvedOptions = function() {
-                    const options = originalResolvedOptions.call(this);
-                    options.timeZone = 'Asia/Ho_Chi_Minh';
-                    options.locale = 'vi-VN';
-                    return options;
-                };
-            }
-            
-            // Mock Vietnamese IP address detection
-            Object.defineProperty(window, '__IP_LOCATION__', {
-                value: {
-                    country: 'VN',
-                    countryCode: 'VN', 
-                    region: 'HN',
-                    city: 'Hanoi',
-                    timezone: 'Asia/Ho_Chi_Minh',
-                    currency: 'VND'
-                },
-                writable: false
-            });
-            """
-            driver.execute_script(location_script)
-            
-            # Wait for settings to apply
-            time.sleep(2)
             
         except Exception as e:
             pass
@@ -220,14 +121,14 @@ def get_driver(is_headless=True):
             options.add_argument('--lang=vi-VN')
             options.add_argument(f'user-agent={get_random_user_agent()}')
             
-            # Enhanced GPS spoofing for Edge
+            # Enhanced GPS spoofing for Edge - removed proxy settings
             options.add_argument('--disable-blink-features=AutomationControlled')
             options.add_experimental_option("excludeSwitches", ["enable-automation"])
             options.add_experimental_option('useAutomationExtension', False)
             options.add_argument('--disable-web-security')
             options.add_argument('--allow-running-insecure-content')
             
-            # Fake geolocation via prefs (Edge/Chromium)
+            # Fake geolocation via prefs
             prefs = {
                 "profile.default_content_setting_values.geolocation": 1,
                 "profile.managed_default_content_settings.geolocation": 1,
@@ -242,9 +143,8 @@ def get_driver(is_headless=True):
             # Remove automation indicators
             driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             
-            # Apply GPS spoofing for Edge (Vietnam only)
+            # Apply GPS spoofing for Edge
             try:
-                
                 driver.execute_cdp_cmd("Emulation.setGeolocationOverride", {
                     "latitude": 21.028511,
                     "longitude": 105.854164,
@@ -258,34 +158,6 @@ def get_driver(is_headless=True):
                 driver.execute_cdp_cmd("Emulation.setLocaleOverride", {
                     "locale": "vi-VN"
                 })
-                
-                driver.execute_cdp_cmd("Network.setUserAgentOverride", {
-                    "userAgent": get_random_user_agent(),
-                    "acceptLanguage": "vi-VN,vi;q=0.9,en;q=0.8",
-                    "platform": "Win32"
-                })
-                
-                # Additional location override via JavaScript
-                location_script = """
-                navigator.geolocation.getCurrentPosition = function(success, error, options) {
-                    success({
-                        coords: {
-                            latitude: 21.028511,
-                            longitude: 105.854164,
-                            accuracy: 100,
-                            altitude: null,
-                            altitudeAccuracy: null,
-                            heading: null,
-                            speed: null
-                        },
-                        timestamp: Date.now()
-                    });
-                };
-                """
-                driver.execute_script(location_script)
-                
-                # Wait for settings to apply
-                time.sleep(2)
                 
             except Exception as e:
                 pass
@@ -575,20 +447,20 @@ def scrape_booking_data(url):
         # Sử dụng hàm get_driver để hỗ trợ cả Docker (Chrome) và Local (Edge) 
         driver = get_driver(is_headless=True)
 
-        
-        driver.set_page_load_timeout(45)
+        # Set page load timeout (longer if using proxy)
+        page_load_timeout = 60  # Longer timeout for proxy
+        driver.set_page_load_timeout(page_load_timeout)
 
-        # Retry logic for page load (Phase 1: Immediate Retry)
-        # Cơ chế thử lại ngay lập tức khi tải trang thất bại (Phase 1)
+        # Retry logic for page load with better error handling
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 # print(f"Loading URL (Attempt {attempt+1}/{max_retries}): {forced_url}")
                 driver.get(forced_url)
                 
-                # Apply GPS spoofing and verify on first attempt
+                # Apply GPS spoofing and verify on first attempt (now with Vietnam proxy IP)
                 if attempt == 0:
-                    # Add Vietnamese cookies
+                    # Add Vietnamese cookies (enhanced with proxy Vietnam IP)
                     try:
                         vietnamese_cookies = [
                             {'name': 'booked_before', 'value': '1'},
@@ -598,6 +470,8 @@ def scrape_booking_data(url):
                             {'name': 'market_country', 'value': 'vn'},
                             {'name': 'detected_country', 'value': 'vn'},
                             {'name': 'timezone', 'value': 'Asia/Ho_Chi_Minh'},
+                            {'name': 'selected_currency', 'value': 'VND'},
+                            {'name': 'lang', 'value': 'vi'}
                         ]
                         
                         for cookie in vietnamese_cookies:
@@ -626,18 +500,20 @@ def scrape_booking_data(url):
                     pass
                 
                 # Check for successful load
-                WebDriverWait(driver, 20).until(
+                WebDriverWait(driver, 30).until(  # Longer wait with proxy
                     EC.presence_of_element_located((By.CSS_SELECTOR, 'h2.pp-header__title, h1, [data-testid="price-and-discounted-price"]'))
                 )
+                print(f"Page loaded successfully on attempt {attempt+1}")
                 break # Success, exit retry loop
             except Exception as e:
-                # print(f"Attempt {attempt+1} failed: {str(e)}")
+                print(f"Attempt {attempt+1} failed: {str(e)}")
                 if attempt < max_retries - 1:
+                    print("Waiting 5 seconds before retry...")
                     time.sleep(5) # Wait before retry
                 # If last attempt fails, loop will finish and code proceeds below
                 # potentially leading to empty result or further error which is caught by caller
 
-        time.sleep(random.uniform(2, 4))
+        time.sleep(random.uniform(3, 6))  # Longer wait with proxy
         
         # Force Vietnamese currency if not already set
         try:
@@ -734,10 +610,87 @@ def scrape_booking_data(url):
                 if facility_text:
                     result['popular_facilities'].append(facility_text)
         except Exception as e:
+            print(f"Facility extraction failed: {str(e)}")
             pass
 
         try:
             room_rows = driver.find_elements(By.CSS_SELECTOR, 'tr.js-rt-block-row')
+            
+            # If no room rows found with primary selector, try alternatives
+            if not room_rows:
+                # Try different selectors for Vietnamese market
+                alternative_selectors = [
+                    # Primary Vietnamese market selectors (from debug HTML analysis)
+                    'table#hprt-table tbody tr',
+                    '.hprt-table tbody tr',
+                    'tr[data-block-id]',
+                    'tr[data-hotel-rounded-price]', 
+                    'tr.js-rt-block-row',
+                    'tr.hprt-table-row',
+                    'tr.e2e-hprt-table-row',
+                    '.hprt-roomtype-block',
+                    '.hprt-block',
+                    '.hprt-price-block',
+                    '.prco-wrapper',
+                    '.bui-price-display',
+                    
+                    # Room type and content selectors
+                    '.hprt-table-cell-roomtype',
+                    '.hprt-roomtype-link',
+                    '.hprt-roomtype-icon-link',
+                    '.hp-rt-group_recommendation',
+                    '.rt-bed-types',
+                    '.hprt-facilities-facility',
+                    '.c-occupancy-icons',
+                    
+                    # Price and availability selectors
+                    '.js-average-per-night-price',
+                    '.js-strikethrough-price',
+                    '.bui-price-display__value',
+                    '.hprt-nos-select',
+                    '.only_x_left',
+                    '.urgency_message_red',
+                    '.thisRoomAvailabilityNew',
+                    
+                    # Vietnamese market specific content
+                    '[data-block-id*="_"]',
+                    '*:contains("VND")',
+                    '*:contains("phòng")',
+                    '*:contains("Tiết kiệm")',
+                    '*:contains("Ưu Đãi")',
+                    '*:contains("Được giới thiệu cho")',
+                    '*:contains("Chúng tôi còn")',
+                    '*:contains("Không hoàn tiền")',
+                    
+                    # Original alternative selectors
+                    '[data-block-id]',
+                    '.rt-room-type',
+                    '[data-testid*="room"]',
+                    '.accommodation-type',
+                    '.room-recommendation',
+                    '.bui-room-table__row',
+                    '.hp-accommodation-block',
+                    '.hp-room-types__item',
+                    '.room-info-container',
+                    '.roomtable',
+                    '[data-room-id]',
+                    '.availability-table tr',
+                    '.room-option',
+                    '.bicon-room + .bicon__text',
+                    '.room-details-wrapper',
+                    # Modern Booking.com selectors
+                    '[data-testid="accommodation-option"]',
+                    '[data-testid="room-option"]', 
+                    '[data-testid="room-info"]',
+                    '.bui-table__row',
+                    '.sr-room__title-container',
+                    '.room-type-block'
+                ]
+                
+                for selector in alternative_selectors:
+                    room_rows = driver.find_elements(By.CSS_SELECTOR, selector)
+                    if room_rows:
+                        break
             
             row_index = 0
             while row_index < len(room_rows):
@@ -769,10 +722,28 @@ def scrape_booking_data(url):
                             'discount_percent': None
                         }
                         
-                        # Lấy room name
+                        # Lấy room name - Enhanced selectors for Vietnamese market
                         try:
-                            room_name_elem = room_type_header.find_element(By.CSS_SELECTOR, '.hprt-roomtype-link, .hprt-roomtype-icon-link')
-                            room_common_data['room_type'] = room_name_elem.text.strip()
+                            room_name_selectors = [
+                                '.hprt-roomtype-link',
+                                '.hprt-roomtype-icon-link', 
+                                '.hprt-roomtype-name',
+                                'a[data-room-name]',
+                                '.room-name',
+                                '.sr-room__title',
+                                'h4',
+                                'h3'
+                            ]
+                            
+                            for selector in room_name_selectors:
+                                try:
+                                    room_name_elem = room_type_header.find_element(By.CSS_SELECTOR, selector)
+                                    room_name = room_name_elem.text.strip()
+                                    if room_name and len(room_name) > 3:
+                                        room_common_data['room_type'] = room_name
+                                        break
+                                except:
+                                    continue
                         except:
                             pass
                         
@@ -839,25 +810,44 @@ def scrape_booking_data(url):
                         except:
                             pass
                         
-                        # Lấy diện tích phòng
+                        # Lấy diện tích phòng (Enhanced for Vietnamese market)
                         try:
-                            size_elem = room_type_header.find_element(By.CSS_SELECTOR, '.hprt-roomtype-icon-info .bui-u-sr-only')
-                            size_text = size_elem.text.strip()
-                            size_match = re.search(r'(\d+)\s*m', size_text)
-                            if size_match:
-                                room_common_data['room_size'] = size_match.group(1) + ' m²'
+                            size_selectors = [
+                                # From debug HTML analysis
+                                '.hprt-facilities-facility[data-name-en="room size"] .bui-badge__text',
+                                '.hprt-facilities-facility span:contains("m²")',
+                                '.hprt-facilities-facility:contains("22 m²")',
+                                
+                                # Original selectors
+                                '.hprt-roomtype-icon-info .bui-u-sr-only',
+                                '*[contains(text(), "m²")]',
+                                '*[contains(text(), "m2")]',
+                                '*[contains(text(), "feet²")]',
+                                '*[contains(text(), "ft²")]'
+                            ]
+                            
+                            for selector in size_selectors:
+                                try:
+                                    if 'contains' in selector:
+                                        size_elem = room_type_header.find_element(By.XPATH, f'.//{selector}')
+                                    else:
+                                        size_elem = room_type_header.find_element(By.CSS_SELECTOR, selector)
+                                    
+                                    size_text = size_elem.text.strip()
+                                    # Match various size formats: "22 m²", "250 ft²", etc.
+                                    size_match_m = re.search(r'(\d+)\s*m[²2]?', size_text, re.IGNORECASE)
+                                    size_match_ft = re.search(r'(\d+)\s*(feet²?|ft²?)', size_text, re.IGNORECASE)
+                                    
+                                    if size_match_m:
+                                        room_common_data['room_size'] = f"{size_match_m.group(1)} m²"
+                                        break
+                                    elif size_match_ft:
+                                        room_common_data['room_size'] = f"{size_match_ft.group(1)} ft²"
+                                        break
+                                except:
+                                    continue
                         except:
-                            try:
-                                size_elem = room_type_header.find_element(By.XPATH, './/*[contains(text(), "m²") or contains(text(), "m2") or contains(text(), "feet²") or contains(text(), "ft²")]')
-                                size_text = size_elem.text.strip()
-                                size_match_m = re.search(r'(\d+)\s*m', size_text)
-                                size_match_ft = re.search(r'(\d+)\s*(feet²|ft²)', size_text)
-                                if size_match_m:
-                                    room_common_data['room_size'] = size_match_m.group(1) + ' m²'
-                                elif size_match_ft:
-                                    room_common_data['room_size'] = size_match_ft.group(1) + ' ft²'
-                            except:
-                                pass
+                            pass
                         
                         # Bây giờ lấy thông tin pricing cho từng option (rowspan lần)
                         for option_idx in range(rowspan):
@@ -875,44 +865,112 @@ def scrape_booking_data(url):
                             }
                             
                             try:
-                                # Lấy facilities từ pricing row
-                                choice_elems = pricing_row.find_elements(By.CSS_SELECTOR, '.hprt-table-cell-conditions li')
-                                for choice in choice_elems:
-                                    choice_text = choice.text.strip()
-                                    choice_text = re.sub(r'^[•\-–—]\s*', '', choice_text)
-                                    choice_text = choice_text.strip()
-                                    if choice_text:
-                                        room_data['facilities'].append(choice_text)
-
+                                # Enhanced facilities extraction for Vietnamese market
+                                facility_selectors = [
+                                    # Vietnamese market specific (from debug analysis)
+                                    '.hprt-table-cell-conditions .bui-list__item',
+                                    '.hprt-conditions-bui .bui-list__item',
+                                    '.bui-list--text .bui-list__item',
+                                    '.hprt-conditions li',
+                                    
+                                    # Room table conditions
+                                    '.hprt-table-cell-conditions li',
+                                    '.hprt-conditions li',
+                                    
+                                    # Standard selectors
+                                    '.e2e-cancellation[data-testid="cancellation-subtitle"]',
+                                    '.e2e-prepayment[data-testid="prepayment-subtitle"]',
+                                    '.bui-list__description',
+                                    '.hprt-conditions-bui li'
+                                ]
+                                
+                                for selector in facility_selectors:
+                                    choice_elems = pricing_row.find_elements(By.CSS_SELECTOR, selector)
+                                    if choice_elems:
+                                        for choice in choice_elems:
+                                            choice_text = choice.text.strip()
+                                            # Clean up bullet points and formatting
+                                            choice_text = re.sub(r'^[•\-–—]\s*', '', choice_text)
+                                            choice_text = choice_text.strip()
+                                            
+                                            # Skip empty or very short text
+                                            if choice_text and len(choice_text) > 3:
+                                                # Extract meaningful parts for Vietnamese content
+                                                lines = choice_text.split('\n')
+                                                for line in lines:
+                                                    line = line.strip()
+                                                    if line and len(line) > 3:
+                                                        # Skip pure price lines
+                                                        if not re.search(r'^\s*\d+[\.,\d]*\s*(VND|USD|EUR)?\s*$', line):
+                                                            room_data['facilities'].append(line)
+                                        break  # Found facilities with this selector, move to next
+                                
+                                # If no facilities found, try broader search
                                 if not room_data['facilities']:
-                                    choice_elems = pricing_row.find_elements(By.CSS_SELECTOR, '.hprt-conditions li')
-                                    for choice in choice_elems:
-                                        choice_text = choice.text.strip()
-                                        choice_text = re.sub(r'^[•\-–—]\s*', '', choice_text)
-                                        choice_text = choice_text.strip()
-                                        if choice_text:
-                                            room_data['facilities'].append(choice_text)                    
+                                    broader_selectors = [
+                                        '.bui-list__description strong',
+                                        '.hprt-table-cell-conditions strong',
+                                        '.policy-title',
+                                        '[data-testid="policy-title"]'
+                                    ]
+                                    
+                                    for selector in broader_selectors:
+                                        elems = pricing_row.find_elements(By.CSS_SELECTOR, selector)
+                                        for elem in elems:
+                                            text = elem.text.strip()
+                                            if text and len(text) > 3 and text not in room_data['facilities']:
+                                                room_data['facilities'].append(text)
+                                                
                             except:
                                 pass
 
-                            # Lấy discount percentage (Tiết kiệm 51%)
+                            # Lấy discount percentage (Enhanced for Vietnamese market)
                             try:
-                                price_cell = pricing_row.find_element(By.CSS_SELECTOR, '.hprt-table-cell-price, [data-testid="price-and-discounted-price"]')
+                                # Look for Vietnamese discount indicators
+                                price_cell = pricing_row.find_element(By.CSS_SELECTOR, '.hprt-table-cell-price, [data-testid="price-and-discounted-price"], .hprt-price-block')
                                 discount_text = price_cell.text
-                                discount_match = re.search(r'Ti[ếe]t ki[ệe]m\s+\d+%', discount_text, re.IGNORECASE)
+                                # Vietnamese patterns: "Tiết kiệm 55%", "Giảm 30%", etc.
+                                discount_match = re.search(r'(?:Ti[ếe]t ki[ệe]m|Gi[aả]m)\s+(\d+)%', discount_text, re.IGNORECASE)
                                 if discount_match:
-                                    room_data['discount_percent'] = discount_match.group(0)
+                                    room_data['discount_percent'] = f"Tiết kiệm {discount_match.group(1)}%"
+                                
+                                # Also look for "Ưu đãi" badges
+                                if not room_data['discount_percent']:
+                                    discount_badges = pricing_row.find_elements(By.CSS_SELECTOR, '.bui-badge__text')
+                                    for badge in discount_badges:
+                                        badge_text = badge.text.strip()
+                                        if 'tiết kiệm' in badge_text.lower() or 'ưu đãi' in badge_text.lower():
+                                            room_data['discount_percent'] = badge_text
+                                            break
                             except:
                                 pass
 
-                            # Lấy giá
+                            # Lấy giá (Enhanced selectors for Vietnamese market)
                             price_selectors = [
+                                # Primary Vietnamese market selectors (from debug analysis)
+                                '.js-average-per-night-price',
+                                '.bui-price-display__value .prc-no-css',
                                 '.bui-price-display__value',
+                                '.prco-text-nowrap-helper',
+                                '.prco-f-font-heading',
+                                
+                                # Strikethrough (original) price selectors
+                                '.js-strikethrough-price',
+                                '.bui-price-display__original',
+                                '.bui-f-color-destructive',
+                                
+                                # Other price containers
                                 '[data-testid="price-and-discounted-price"] .prco-valign-middle-helper',
                                 '.prco-inline-block-maker-helper',
                                 '.bui_font_strong',
                                 '.prco-text-color-bold',
-                                'span[aria-hidden="true"]'
+                                '.hprt-price-block .bui-price-display',
+                                '.prco-wrapper .bui-price-display',
+                                
+                                # Fallback selectors
+                                'span[aria-hidden="true"]',
+                                '.price',
+                                '.rate'
                             ]
                             
                             for selector in price_selectors:
@@ -983,6 +1041,58 @@ def scrape_booking_data(url):
                                 except:
                                     pass
 
+                            # Extract Vietnamese market specific information
+                            try:
+                                # Room availability/scarcity information
+                                scarcity_selectors = [
+                                    '.only_x_left', 
+                                    '.urgency_message_red',
+                                    '.thisRoomAvailabilityNew',
+                                    '.top_scarcity',
+                                    '*:contains("Chúng tôi còn")',
+                                    '*:contains("căn")'
+                                ]
+                                
+                                for selector in scarcity_selectors:
+                                    try:
+                                        if 'contains' in selector:
+                                            scarcity_elem = pricing_row.find_element(By.XPATH, f'.//{selector}')
+                                        else:
+                                            scarcity_elem = pricing_row.find_element(By.CSS_SELECTOR, selector)
+                                        
+                                        scarcity_text = scarcity_elem.text.strip()
+                                        if scarcity_text and ('còn' in scarcity_text or 'left' in scarcity_text):
+                                            room_data['availability_info'] = scarcity_text
+                                            break
+                                    except:
+                                        continue
+                            except:
+                                pass
+                                
+                            # Extract room recommendation info  
+                            try:
+                                recommendation_selectors = [
+                                    '.hp-rt-group_recommendation',
+                                    '*:contains("Được giới thiệu cho")',
+                                    '*:contains("người lớn")'
+                                ]
+                                
+                                for selector in recommendation_selectors:
+                                    try:
+                                        if 'contains' in selector:
+                                            rec_elem = room_type_header.find_element(By.XPATH, f'.//{selector}')
+                                        else:
+                                            rec_elem = room_type_header.find_element(By.CSS_SELECTOR, selector)
+                                        
+                                        rec_text = rec_elem.text.strip()
+                                        if rec_text:
+                                            room_data['recommendation'] = rec_text
+                                            break
+                                    except:
+                                        continue
+                            except:
+                                pass
+
                             # Thêm room data vào result
                             if room_data['room_type'] and room_data['price']:
                                 result['rooms'].append(room_data)
@@ -997,9 +1107,10 @@ def scrape_booking_data(url):
                     row_index += 1
                     continue
         except Exception as e:
+            print(f"Room extraction error: {str(e)}")
             pass
         
-return result, None
+        return result, None
         
     except Exception as e:
         return None, f"Lỗi: {str(e)}"
@@ -1007,9 +1118,3 @@ return result, None
     finally:
         if driver:
             driver.quit()
-        try:
-            import shutil
-            if os.path.exists(temp_dir):
-                shutil.rmtree(temp_dir, ignore_errors=True)
-        except:
-            pass
