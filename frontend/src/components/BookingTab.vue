@@ -129,10 +129,10 @@
     <!-- Step 5: Scrape Button -->
     <div v-if="displayLinks.length > 0 && scraperStore.dateRanges.length > 0" class="mb-4" ref="step5">
       <Button 
-        :label="`Bắt đầu ${scrapeType === 'info' ? 'cào thông tin' : 'cào giá'}`"
-        icon="pi pi-play"
+        :label="isStarting ? 'Đang kết nối...' : `Bắt đầu ${scrapeType === 'info' ? 'cào thông tin' : 'cào giá'}`"
+        :icon="isStarting ? 'pi pi-spinner pi-spin' : 'pi pi-play'"
         class="p-button-lg w-full"
-        :disabled="scraperStore.isScraing"
+        :disabled="scraperStore.isScraing || isStarting"
         @click="startScraping"
       />
     </div>
@@ -299,6 +299,9 @@ const toast = useToast()
 // Sidebar visibility
 const sidebarVisible = ref(false)
 
+// Loading state for immediate UI feedback
+const isStarting = ref(false)
+
 // Sidebar navigation
 const currentStep = ref(1)
 const step1 = ref()
@@ -436,6 +439,8 @@ async function startScraping() {
       return
     }
 
+    // Set loading state immediately for better UX
+    isStarting.value = true
     scraperStore.reset()
 
     if (!scraperWebSocket.isConnected()) {
@@ -444,6 +449,11 @@ async function startScraping() {
 
     scraperWebSocket.onMessage((data) => {
       scraperStore.updateProgress(data)
+      
+      // Clear starting state when scraping actually begins or completes
+      if (data.type === 'started' || data.type === 'completed') {
+        isStarting.value = false
+      }
 
       if (data.type === 'completed') {
         toast.add({
@@ -477,6 +487,9 @@ async function startScraping() {
       life: 3000
     })
   } catch (error: any) {
+    // Clear starting state on error
+    isStarting.value = false
+    
     toast.add({
       severity: 'error',
       summary: 'Lỗi',

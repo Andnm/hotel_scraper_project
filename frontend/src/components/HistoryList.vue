@@ -321,41 +321,81 @@ async function loadHistories() {
 
 function copyApiLink(historyId: number) {
   const url = `${API_BASE_URL}/public/history/${historyId}`
-  navigator.clipboard.writeText(url).then(() => {
-    toast.add({
-      severity: 'success',
-      summary: 'Thành công',
-      detail: 'Đã copy link API Public vào clipboard',
-      life: 3000
+  
+  // Try modern clipboard API first (HTTPS only)
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      toast.add({
+        severity: 'success',
+        summary: 'Thành công',
+        detail: 'Đã copy link API Public vào clipboard',
+        life: 3000
+      })
+    }).catch(() => {
+      fallbackCopyToClipboard(url)
     })
-  }).catch(() => {
-    toast.add({
-      severity: 'error',
-      summary: 'Lỗi',
-      detail: 'Không thể copy link',
-      life: 3000
-    })
-  })
+  } else {
+    fallbackCopyToClipboard(url)
+  }
 }
 
 function copyLatestApiLink(type: 'price' | 'info') {
   const url = `${API_BASE_URL}/public/latest?scrape_type=${type}`
-  navigator.clipboard.writeText(url).then(() => {
-    toast.add({
-      severity: 'success',
-      summary: 'Thành công',
-      detail: `Đã copy link API (${type}) mới nhất`,
-      life: 3000
+  
+  // Try modern clipboard API first (HTTPS only)
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      toast.add({
+        severity: 'success',
+        summary: 'Thành công',
+        detail: `Đã copy link API (${type}) mới nhất`,
+        life: 3000
+      })
+      showLatestApiDialog.value = false
+    }).catch(() => {
+      fallbackCopyToClipboard(url, type)
     })
-    showLatestApiDialog.value = false
-  }).catch(() => {
+  } else {
+    fallbackCopyToClipboard(url, type)
+  }
+}
+
+// Fallback copy method for HTTP (legacy browsers or non-HTTPS)
+function fallbackCopyToClipboard(url: string, type?: 'price' | 'info') {
+  try {
+    const textArea = document.createElement('textarea')
+    textArea.value = url
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-999999px'
+    textArea.style.top = '-999999px'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    
+    const successful = document.execCommand('copy')
+    document.body.removeChild(textArea)
+    
+    if (successful) {
+      const detail = type ? `Đã copy link API (${type}) mới nhất` : 'Đã copy link API Public vào clipboard'
+      toast.add({
+        severity: 'success',
+        summary: 'Thành công',
+        detail: detail,
+        life: 3000
+      })
+      if (type) showLatestApiDialog.value = false
+    } else {
+      throw new Error('Copy command failed')
+    }
+  } catch (err) {
     toast.add({
       severity: 'error',
       summary: 'Lỗi',
-      detail: 'Không thể copy link',
-      life: 3000
+      detail: 'Không thể copy link. Vui lòng copy thủ công từ URL: ' + url,
+      life: 5000
     })
-  })
+    console.error('Fallback copy failed: ', err)
+  }
 }
 
 async function viewDetail(historyId: number) {
