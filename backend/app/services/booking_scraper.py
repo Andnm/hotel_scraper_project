@@ -11,6 +11,19 @@ import tempfile
 import os
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
+import random
+
+def get_random_user_agent():
+    user_agents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    ]
+    return random.choice(user_agents)
+
 try:
     from selenium import webdriver
     from selenium.webdriver.edge.service import Service
@@ -301,7 +314,9 @@ def scrape_booking_data(url):
     options.add_argument(f'--user-data-dir={temp_dir}')
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option('useAutomationExtension', False)
-    options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0')
+    
+    # Randomize User-Agent to avoid detection
+    options.add_argument(f'user-agent={get_random_user_agent()}')
     
     driver = None
 
@@ -323,6 +338,25 @@ def scrape_booking_data(url):
             service = Service()
         
         driver = webdriver.Edge(service=service, options=options)
+        
+        # --- FAKE GEOLOCATION & TIMEZONE (VIETNAM) ---
+        # Giả lập vị trí và múi giờ Việt Nam để lấy dữ liệu chính xác hơn khi deploy server nước ngoài
+        try:
+            # Set coordinates to Hanoi, Vietnam
+            driver.execute_cdp_cmd("Emulation.setGeolocationOverride", {
+                "latitude": 21.028511,
+                "longitude": 105.854164,
+                "accuracy": 100
+            })
+            # Set timezone to Asia/Ho_Chi_Minh
+            driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {
+                "timezoneId": "Asia/Ho_Chi_Minh"
+            })
+        except Exception as e:
+            # Nếu giả lập thất bại thì vẫn chạy tiếp chứ không dừng chương trình
+            print(f"⚠️ Could not set geolocation/timezone: {e}")
+        # ---------------------------------------------
+        
         driver.set_page_load_timeout(45)
 
         # Retry logic for page load (Phase 1: Immediate Retry)

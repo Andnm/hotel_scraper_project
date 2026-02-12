@@ -253,6 +253,24 @@ def scrape_agoda_data(url):
     try:
         service = Service()
         driver = webdriver.Edge(service=service, options=options)
+        
+        # --- FAKE GEOLOCATION & TIMEZONE (VIETNAM) ---
+        # Giả lập vị trí và múi giờ Việt Nam
+        try:
+            # Set coordinates to Hanoi, Vietnam
+            driver.execute_cdp_cmd("Emulation.setGeolocationOverride", {
+                "latitude": 21.028511,
+                "longitude": 105.854164,
+                "accuracy": 100
+            })
+            # Set timezone to Asia/Ho_Chi_Minh
+            driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {
+                "timezoneId": "Asia/Ho_Chi_Minh"
+            })
+        except Exception as e:
+            print(f"⚠️ Could not set geolocation/timezone: {e}")
+        # ---------------------------------------------
+
         driver.set_page_load_timeout(45)
         
         # Retry logic for page load (Phase 1: Immediate Retry)

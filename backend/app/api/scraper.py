@@ -8,6 +8,7 @@ from app.database.repositories import CrawlHistoryRepository, CrawlDataRepositor
 from app.services.booking_scraper import scrape_booking_data
 from app.services.agoda_scraper import scrape_agoda_data
 import re
+import random # Add random for delay
 
 router = APIRouter()
 
@@ -259,6 +260,11 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                         }, websocket)
 
                     processed_links += 1
+                    
+                    # === RANDOM DELAY TO AVOID IP BAN ===
+                    # Nghỉ ngẫu nhiên từ 3 đến 6 giây giữa các lần request
+                    delay = random.uniform(3, 6)
+                    await asyncio.sleep(delay)
 
             # === XỬ LÝ LẠI DANH SÁCH LỖI (RETRY PHASE - PHASE 2) ===
             if failed_retry_queue:
