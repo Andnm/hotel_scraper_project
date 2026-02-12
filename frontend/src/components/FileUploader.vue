@@ -9,7 +9,7 @@
         accept=".xlsx,.xls"
         :maxFileSize="10000000"
         :auto="false"
-        chooseLabel="+ Chọn file Excel"
+        chooseLabel="Chọn file Excel"
         @select="handleFileSelect"
         style="margin-top: 0.75rem"
       />

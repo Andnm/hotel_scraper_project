@@ -42,7 +42,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: /api
+        VITE_API_URL: http://projecthub.io.vn/api
     container_name: hotel_frontend
     restart: always
     ports:
