@@ -18,6 +18,10 @@ export interface CrawlHistory {
   crawl_date: string
   crawl_target?: string
   source: string
+  scrape_type: 'info' | 'price'
+  market?: string
+  check_in?: string
+  check_out?: string
   total_records: number
   created_at: string
 }

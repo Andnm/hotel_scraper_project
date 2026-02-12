@@ -130,4 +130,9 @@ export const useScraperStore = defineStore('scraper', () => {
     reset,
     resetLinks
   }
+}, {
+  persist: {
+    key: 'scraper-state',
+    paths: ['results', 'links', 'dateRanges', 'selectedSource', 'historyId']
+  }
 })

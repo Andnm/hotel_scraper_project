@@ -51,7 +51,9 @@ class CrawlHistoryRepository:
         offset: int = 0, 
         source_filter: Optional[str] = None, 
         date_from: Optional[date] = None, 
-        date_to: Optional[date] = None
+        date_to: Optional[date] = None,
+        scrape_type: Optional[str] = None,
+        market: Optional[str] = None
     ) -> List[Dict]:
         with get_db_connection() as conn:
             cursor = conn.cursor(dictionary=True)
@@ -70,6 +72,14 @@ class CrawlHistoryRepository:
                 if date_to:
                     query += " AND crawl_date <= %s"
                     params.append(date_to)
+
+                if scrape_type and scrape_type.lower() != "all":
+                    query += " AND scrape_type = %s"
+                    params.append(scrape_type.lower())
+
+                if market:
+                    query += " AND market LIKE %s"
+                    params.append(f"%{market}%")
                 
                 query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
                 params.extend([limit, offset])
@@ -125,7 +135,9 @@ class CrawlHistoryRepository:
         self, 
         source_filter: Optional[str] = None, 
         date_from: Optional[date] = None, 
-        date_to: Optional[date] = None
+        date_to: Optional[date] = None,
+        scrape_type: Optional[str] = None,
+        market: Optional[str] = None
     ) -> int:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -144,6 +156,14 @@ class CrawlHistoryRepository:
                 if date_to:
                     query += " AND crawl_date <= %s"
                     params.append(date_to)
+
+                if scrape_type and scrape_type.lower() != "all":
+                    query += " AND scrape_type = %s"
+                    params.append(scrape_type.lower())
+
+                if market:
+                    query += " AND market LIKE %s"
+                    params.append(f"%{market}%")
                 
                 cursor.execute(query, params)
                 count = cursor.fetchone()[0]
@@ -284,7 +304,10 @@ class CrawlDataRepository:
                     SELECT 
                         cd.*,
                         ch.crawl_date,
-                        ch.crawl_target
+                        ch.crawl_target,
+                        ch.check_in,
+                        ch.check_out,
+                        ch.scrape_type
                     FROM crawl_data cd
                     JOIN crawl_history ch ON cd.history_id = ch.id
                     WHERE cd.history_id = %s

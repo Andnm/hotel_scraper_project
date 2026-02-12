@@ -129,7 +129,7 @@
     <!-- Step 5: Scrape Button -->
     <div v-if="displayLinks.length > 0 && scraperStore.dateRanges.length > 0" class="mb-4" ref="step5">
       <Button 
-        :label="`🚀 Bắt đầu ${scrapeType === 'info' ? 'cào thông tin' : 'cào giá'}`"
+        :label="`Bắt đầu ${scrapeType === 'info' ? 'cào thông tin' : 'cào giá'}`"
         icon="pi pi-play"
         class="p-button-lg w-full"
         :disabled="scraperStore.isScraing"
@@ -159,6 +159,7 @@
         >
           <!-- Info Mode Columns -->
           <template v-if="scrapeType === 'info'">
+            <Column field="Ngày cào" header="Ngày cào" :style="{ width: '110px' }" frozen></Column>
             <Column field="Giờ cào" header="Giờ cào" :style="{ width: '100px' }" frozen></Column>
             <Column field="Check in" header="Check in" :style="{ width: '110px' }"></Column>
             <Column field="Check out" header="Check out" :style="{ width: '110px' }"></Column>
@@ -488,8 +489,38 @@ async function startScraping() {
 function downloadExcel() {
   try {
     import('xlsx').then((XLSX) => {
+      let filteredResults = [];
+
+      if (scrapeType.value === 'info') {
+        const columns = [
+          'Ngày cào', 'Giờ cào', 'Check in', 'Check out', 
+          'Tên khách sạn', 'Link khách sạn', 
+          'Số lượng review', 'Điểm review', 'Các tiện nghi được ưa chuộng nhất',
+          'Tên hạng phòng', 'Số lượng người', 'Giường', 'Diện tích phòng', 'Các lựa chọn'
+        ];
+        
+        filteredResults = scraperStore.results.map(item => {
+            const newItem: any = {};
+            columns.forEach(col => newItem[col] = item[col]);
+            return newItem;
+        });
+      } else {
+        // Price mode
+        const columns = [
+          'Ngày cào', 'Giờ cào', 'Check in', 'Check out',
+          'Tên khách sạn', 'Tên hạng phòng', 'Số lượng người',
+          'Giá sau giảm', 'Giá gốc', 'Giảm giá'
+        ];
+
+        filteredResults = scraperStore.results.map(item => {
+            const newItem: any = {};
+            columns.forEach(col => newItem[col] = item[col]);
+            return newItem;
+        });
+      }
+
       // Tạo worksheet từ results
-      const ws = XLSX.utils.json_to_sheet(scraperStore.results)
+      const ws = XLSX.utils.json_to_sheet(filteredResults)
       
       // Tạo workbook
       const wb = XLSX.utils.book_new()

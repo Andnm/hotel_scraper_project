@@ -179,6 +179,7 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                                     # Common fields
                                     common_data = {
                                         'Hàng_gốc': row_num,
+                                        'Ngày cào': datetime.now().strftime('%Y-%m-%d'),
                                         'Giờ cào': datetime.now().strftime('%H:%M:%S'),
                                         'Check in': checkin_date,
                                         'Check out': checkout_date,
@@ -203,7 +204,6 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                                     else:
                                         # Cào giá: chỉ có thông tin về giá
                                         results.append({
-                                            'Ngày cào': datetime.now().strftime('%Y-%m-%d'),
                                             **common_data,
                                             'Giá sau giảm': price_clean,
                                             'Giá gốc': price_orig_clean,

@@ -14,6 +14,27 @@
             />
           </div>
 
+          <div class="filter-item">            <label>Loại cào</label>
+            <Dropdown 
+              v-model="filters.scrapeType" 
+              :options="scrapeTypeOptions" 
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Chọn loại cào" 
+              class="w-full"
+            />
+          </div>
+
+          <div class="filter-item">
+            <label>Market</label>
+            <InputText 
+              v-model="filters.market" 
+              placeholder="Nhập market (ví dụ: VN, US)" 
+              class="w-full"
+              @keyup.enter="loadHistories"
+            />
+          </div>
+
           <div class="filter-item">
             <label>Từ ngày</label>
             <Calendar 
@@ -21,6 +42,7 @@
               dateFormat="yy-mm-dd"
               showIcon
               class="w-full"
+              @keyup.enter="loadHistories"
             />
           </div>
 
@@ -31,14 +53,17 @@
               dateFormat="yy-mm-dd"
               showIcon
               class="w-full"
+              @keyup.enter="loadHistories"
             />
           </div>
 
-          <div class="filter-item align-end">
+          <div class="filter-item">
+            <label style="visibility: hidden">Thao tác</label>
             <Button 
               label="🔍 Tìm kiếm" 
               @click="loadHistories"
               :loading="historyStore.loading"
+              class="w-full"
             />
           </div>
         </div>
@@ -54,36 +79,59 @@
         <DataTable 
           :value="historyStore.histories" 
           :loading="historyStore.loading"
-          :paginator="true"
-          :rows="10"
-          :rowsPerPageOptions="[10, 20, 50]"
-          paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink JumpToPageInput CurrentPageReport RowsPerPageDropdown"
-          currentPageReportTemplate="Trang {currentPage}/{totalPages} | Hiển thị {first}-{last} / {totalRecords} phiên"
           responsiveLayout="scroll"
           class="p-datatable-sm"
+          showGridlines
+          stripedRows
         >
-          <Column field="id" header="ID" :style="{ width: '80px' }"></Column>
-          <Column field="source" header="Nguồn" :style="{ width: '120px' }">
+          <Column field="id" header="ID" :style="{ width: '70px' }" sortable></Column>
+          <Column field="source" header="Nguồn" :style="{ width: '90px' }">
             <template #body="slotProps">
               <Tag :severity="getSourceSeverity(slotProps.data.source)">
                 {{ slotProps.data.source.toUpperCase() }}
               </Tag>
             </template>
           </Column>
-          <Column field="crawl_date" header="Ngày cào" :style="{ width: '140px' }">
+          <Column field="scrape_type" header="Loại cào" :style="{ width: '100px' }">
+            <template #body="slotProps">
+              <Tag :severity="slotProps.data.scrape_type === 'info' ? 'info' : 'warning'">
+                {{ slotProps.data.scrape_type === 'info' ? 'Thông tin' : 'Cào giá' }}
+              </Tag>
+            </template>
+          </Column>
+          <Column field="market" header="Market" :style="{ width: '90px' }">
+            <template #body="slotProps">
+              <Tag v-if="slotProps.data.market" severity="secondary">
+                {{ slotProps.data.market }}
+              </Tag>
+              <span v-else style="color: #999">All</span>
+            </template>
+          </Column>
+          <Column field="crawl_date" header="Ngày cào" :style="{ width: '105px' }" sortable>
             <template #body="slotProps">
               {{ formatDate(slotProps.data.crawl_date) }}
             </template>
           </Column>
-          <Column field="created_at" header="Thời điểm lưu" :style="{ width: '180px' }">
+          <Column header="Check-in → Check-out" :style="{ width: '190px' }">
+            <template #body="slotProps">
+              <div v-if="slotProps.data.check_in && slotProps.data.check_out" style="font-size: 0.9em">
+                <span style="color: #10b981">{{ formatDate(slotProps.data.check_in) }}</span>
+                <span style="color: #999"> → </span>
+                <span style="color: #ef4444">{{ formatDate(slotProps.data.check_out) }}</span>
+              </div>
+              <span v-else style="color: #999">-</span>
+            </template>
+          </Column>
+          <Column field="created_at" header="Lưu lúc" :style="{ width: '145px' }" sortable>
             <template #body="slotProps">
               {{ formatDateTime(slotProps.data.created_at) }}
             </template>
           </Column>
-          <Column field="total_records" header="Records" :style="{ width: '100px' }"></Column>
-          <Column field="crawl_target" header="Các ngày cần cào">
+          <Column field="total_records" header="Records" :style="{ width: '90px' }" sortable>
             <template #body="slotProps">
-              {{ slotProps.data.crawl_target || '-' }}
+              <Tag :severity="slotProps.data.total_records > 0 ? 'success' : 'danger'">
+                {{ slotProps.data.total_records }}
+              </Tag>
             </template>
           </Column>
           <Column header="Thao tác" :style="{ width: '150px' }">
@@ -112,13 +160,16 @@
           </Column>
         </DataTable>
 
-        <!-- Pagination -->
+        <!-- Server-side Pagination -->
         <Paginator
-          v-if="historyStore.totalPages > 1"
+          v-if="historyStore.totalCount > 0"
           :rows="historyStore.pageSize"
           :totalRecords="historyStore.totalCount"
           :first="(historyStore.currentPage - 1) * historyStore.pageSize"
+          :rowsPerPageOptions="[10, 20, 50, 100]"
           @page="onPageChange"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink JumpToPageInput CurrentPageReport RowsPerPageDropdown"
+          currentPageReportTemplate="Trang {currentPage}/{totalPages} | Hiển thị {first}-{last} trên tổng {totalRecords} phiên"
           class="mt-3"
         />
       </template>
@@ -140,6 +191,15 @@
             <strong>Nguồn:</strong> {{ historyStore.currentHistory.source.toUpperCase() }}
           </div>
           <div class="info-item">
+            <strong>Loại cào:</strong> 
+            <Tag :severity="historyStore.currentHistory.scrape_type === 'info' ? 'info' : 'warning'" style="margin-left: 0.5rem">
+              {{ historyStore.currentHistory.scrape_type === 'info' ? 'Thông tin' : 'Cào giá' }}
+            </Tag>
+          </div>
+          <div class="info-item" v-if="historyStore.currentHistory.market">
+            <strong>Market:</strong> {{ historyStore.currentHistory.market }}
+          </div>
+          <div class="info-item">
             <strong>Tổng records:</strong> {{ historyStore.currentHistory.total_records }}
           </div>
         </div>
@@ -152,15 +212,78 @@
           paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink JumpToPageInput CurrentPageReport RowsPerPageDropdown"
           currentPageReportTemplate="Trang {currentPage}/{totalPages} | Hiển thị {first}-{last} / {totalRecords} dòng"
           responsiveLayout="scroll"
+          showGridlines
         >
-          <Column field="hotel_name" header="Khách sạn"></Column>
-          <Column field="room_type" header="Loại phòng"></Column>
-          <Column field="price_after_discount" header="Giá">
-            <template #body="slotProps">
-              {{ formatPrice(slotProps.data.price_after_discount) }}
-            </template>
-          </Column>
-          <Column field="review_score" header="Điểm"></Column>
+          <!-- Info Mode Columns -->
+          <template v-if="historyStore.currentHistory.scrape_type === 'info'">
+            <Column field="hotel_name" header="Khách sạn" :style="{ minWidth: '200px' }"></Column>
+            <Column field="hotel_link" header="Link" :style="{ width: '80px' }">
+              <template #body="slotProps">
+                <a :href="slotProps.data.hotel_link" target="_blank" v-if="slotProps.data.hotel_link">
+                  <Button icon="pi pi-external-link" text size="small" />
+                </a>
+              </template>
+            </Column>
+            <Column field="review_count" header="Số review" :style="{ width: '100px' }"></Column>
+            <Column field="review_score" header="Điểm" :style="{ width: '80px' }"></Column>
+            <Column field="popular_facilities" header="Tiện nghi" :style="{ minWidth: '200px' }">
+              <template #body="slotProps">
+                <div 
+                  class="text-ellipsis" 
+                  v-tooltip.top="slotProps.data.popular_facilities"
+                  style="cursor: help;"
+                >
+                  {{ slotProps.data.popular_facilities }}
+                </div>
+              </template>
+            </Column>
+            <Column field="room_type" header="Loại phòng" :style="{ minWidth: '200px' }"></Column>
+            <Column field="num_people" header="Số người" :style="{ width: '90px' }"></Column>
+            <Column field="bed_info" header="Giường" :style="{ minWidth: '150px' }"></Column>
+            <Column field="room_area" header="Diện tích" :style="{ width: '100px' }"></Column>
+            <Column field="room_choices" header="Các lựa chọn" :style="{ minWidth: '250px' }">
+              <template #body="slotProps">
+                <div 
+                  class="text-ellipsis" 
+                  v-tooltip.top="slotProps.data.options?.facilities || slotProps.data.room_choices"
+                  style="cursor: help;"
+                >
+                  {{ slotProps.data.options?.facilities || slotProps.data.room_choices }}
+                </div>
+              </template>
+            </Column>
+          </template>
+
+          <!-- Price Mode Columns -->
+          <template v-else>
+            <Column field="hotel_name" header="Khách sạn" :style="{ minWidth: '200px' }"></Column>
+            <Column field="room_type" header="Loại phòng" :style="{ minWidth: '200px' }"></Column>
+            <Column field="num_people" header="Số người" :style="{ width: '90px' }"></Column>
+            <Column field="price_after_discount" header="Giá sau giảm" :style="{ width: '140px' }">
+              <template #body="slotProps">
+                {{ formatPrice(slotProps.data.price_after_discount) }}
+              </template>
+            </Column>
+            <Column field="price_original" header="Giá gốc" :style="{ width: '140px' }">
+              <template #body="slotProps">
+                {{ formatPrice(slotProps.data.price_original) }}
+              </template>
+            </Column>
+            <Column field="discount_percent" header="Giảm giá" :style="{ width: '120px' }">
+              <template #body="slotProps">
+                <Tag v-if="slotProps.data.discount_percent" severity="success">
+                  {{ slotProps.data.discount_percent }}
+                </Tag>
+              </template>
+            </Column>
+            <Column field="hotel_link" header="Link" :style="{ width: '80px' }">
+              <template #body="slotProps">
+                <a :href="slotProps.data.hotel_link" target="_blank" v-if="slotProps.data.hotel_link">
+                  <Button icon="pi pi-external-link" text size="small" />
+                </a>
+              </template>
+            </Column>
+          </template>
         </DataTable>
       </div>
     </Dialog>
@@ -182,10 +305,18 @@ const confirm = useConfirm()
 const filters = ref({
   source: 'Tất cả',
   dateFrom: null as Date | null,
-  dateTo: null as Date | null
+  dateTo: null as Date | null,
+  scrapeType: 'all',
+  market: ''
 })
 
 const sourceOptions = ['Tất cả', 'Booking', 'Agoda']
+const scrapeTypeOptions = [
+  { label: 'Tất cả', value: 'all' },
+  { label: 'Thông tin', value: 'info' },
+  { label: 'Cào giá', value: 'price' }
+]
+
 const showDetailDialog = ref(false)
 const selectedHistoryId = ref<number | null>(null)
 
@@ -206,7 +337,9 @@ async function loadHistories() {
       1,
       filters.value.source === 'Tất cả' ? undefined : filters.value.source,
       dateFrom,
-      dateTo
+      dateTo,
+      filters.value.scrapeType,
+      filters.value.market
     )
   } catch (error: any) {
     toast.add({
@@ -233,13 +366,80 @@ async function viewDetail(historyId: number) {
   }
 }
 
-function exportExcel(historyId: number) {
-  toast.add({
-    severity: 'info',
-    summary: 'Tính năng',
-    detail: 'Tính năng xuất Excel đang được phát triển',
-    life: 3000
-  })
+async function exportExcel(historyId: number) {
+  try {
+    toast.add({
+      severity: 'info',
+      summary: 'Đang xử lý',
+      detail: 'Đang tải dữ liệu và tạo file Excel...',
+      life: 3000
+    })
+
+    const data = await historyStore.exportHistory(historyId)
+    
+    if (!data || data.length === 0) {
+      toast.add({
+        severity: 'warn',
+        summary: 'Thông báo',
+        detail: 'Không có dữ liệu để xuất',
+        life: 3000
+      })
+      return
+    }
+
+    const scrapeType = data.length > 0 ? data[0].scrape_type : 'info';
+
+    // Define columns to match Main UI exactly
+    const infoColumns = [
+      'Ngày cào', 'Giờ cào', 'Check in', 'Check out', 
+      'Tên khách sạn', 'Link khách sạn', 
+      'Số lượng review', 'Điểm review', 'Các tiện nghi được ưa chuộng nhất',
+      'Tên hạng phòng', 'Số lượng người', 'Giường', 'Diện tích phòng', 'Các lựa chọn'
+    ];
+    
+    const priceColumns = [
+      'Ngày cào', 'Giờ cào', 'Check in', 'Check out',
+      'Tên khách sạn', 'Tên hạng phòng', 'Số lượng người',
+      'Giá sau giảm', 'Giá gốc', 'Giảm giá'
+    ];
+    
+    const targetColumns = scrapeType === 'price' ? priceColumns : infoColumns;
+
+    // Filter and order data
+    const filteredData = data.map((item: any) => {
+      const newItem: any = {};
+      targetColumns.forEach(col => {
+         // Use existing value or empty string if N/A to keep Excel clean, or keep N/A if preferred. 
+         // User UI often shows text, so let's keep original values.
+         newItem[col] = item[col]; 
+      });
+      return newItem;
+    });
+
+    import('xlsx').then((XLSX) => {
+      const ws = XLSX.utils.json_to_sheet(filteredData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "Data")
+      const filename = `history_export_${historyId}_${new Date().toISOString().slice(0,10)}.xlsx`
+      XLSX.writeFile(wb, filename)
+      
+      toast.add({
+        severity: 'success',
+        summary: 'Thành công',
+        detail: 'Đã xuất file Excel',
+        life: 3000
+      })
+    })
+
+  } catch (error: any) {
+    console.error(error)
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: error.message || 'Không thể xuất Excel',
+      life: 3000
+    })
+  }
 }
 
 function confirmDelete(historyId: number) {
@@ -274,7 +474,26 @@ async function deleteHistory(historyId: number) {
 
 function onPageChange(event: any) {
   const page = event.page + 1
-  loadHistories()
+  
+  // Update page size if changed
+  if (event.rows && event.rows !== historyStore.pageSize) {
+    historyStore.pageSize = event.rows
+  }
+  
+  // Load data for the new page
+  const dateFrom = filters.value.dateFrom 
+    ? formatDateToString(filters.value.dateFrom) 
+    : undefined
+  const dateTo = filters.value.dateTo 
+    ? formatDateToString(filters.value.dateTo) 
+    : undefined
+  
+  historyStore.fetchHistories(
+    page,
+    filters.value.source === 'Tất cả' ? undefined : filters.value.source,
+    dateFrom,
+    dateTo
+  )
 }
 
 function formatDate(dateStr: string): string {

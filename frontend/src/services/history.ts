@@ -7,12 +7,16 @@ export const historyService = {
     pageSize: number = 10,
     source?: string,
     dateFrom?: string,
-    dateTo?: string
+    dateTo?: string,
+    scrapeType?: string,
+    market?: string
   ): Promise<HistoryListResponse> {
     const params: any = { page, page_size: pageSize }
     if (source && source !== 'Tất cả') params.source = source.toLowerCase()
     if (dateFrom) params.date_from = dateFrom
     if (dateTo) params.date_to = dateTo
+    if (scrapeType && scrapeType !== 'all') params.scrape_type = scrapeType
+    if (market) params.market = market
 
     const response = await apiClient.get('/histories', { params })
     return response.data

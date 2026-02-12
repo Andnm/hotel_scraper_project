@@ -469,38 +469,54 @@ def scrape_booking_data(url):
                         except:
                             pass
                         
-                        # Lấy số lượng khách - count bicon bicon-occupancy icons
+                        # Lấy số lượng khách - ưu tiên tìm trong room_type_header trước
                         try:
-                            # Try new selector format first
-                            occupancy_icons = room_type_header.find_elements(By.CSS_SELECTOR, '.c-occupancy-icons__adults svg, .c-occupancy-icons__adults i')
-                            if occupancy_icons:
-                                room_common_data['num_guests'] = str(len(occupancy_icons))
-                            else:
-                                # Fallback to old selector
-                                occupancy_icons = room_type_header.find_elements(By.CSS_SELECTOR, 'span .bicon.bicon-occupancy')
+                            num_guests_found = False
+                            
+                            # 1. Thử tìm text "Được giới thiệu cho X người" hoặc "Max people: X"
+                            try:
+                                # Tìm các thẻ h3, div, span có thể chứa thông tin này
+                                candidates = room_type_header.find_elements(By.CSS_SELECTOR, '.e2e-gr-title, .hprt-occupancy-occupancy-info, .maxPersons-container, .c-occupancy-icons')
+                                for cand in candidates:
+                                    text = cand.get_attribute('textContent').strip()
+                                    # Match "Được giới thiệu cho 2 người"
+                                    match = re.search(r'(?:Được giới thiệu cho|Max people:|Số người tối đa:)\s*(\d+)', text, re.IGNORECASE)
+                                    if match:
+                                        room_common_data['num_guests'] = match.group(1)
+                                        num_guests_found = True
+                                        break
+                            except:
+                                pass
+
+                            if not num_guests_found:
+                                # 2. Count occupancy icons - selector: .c-occupancy-icons__adults i.bicon-occupancy
+                                # Tìm trong cả row vì có thể icon nằm ở cell khác
+                                occupancy_icons = row.find_elements(By.CSS_SELECTOR, '.c-occupancy-icons__adults i.bicon-occupancy')
+                                if not occupancy_icons:
+                                     occupancy_icons = row.find_elements(By.CSS_SELECTOR, '.c-occupancy-icons__adults .bicon.bicon-occupancy')
+                                
                                 if occupancy_icons:
                                     room_common_data['num_guests'] = str(len(occupancy_icons))
-                        except:
-                            try:
-                                guests_elem = room_type_header.find_element(By.CSS_SELECTOR, '.bui-u-sr-only')
+                                    num_guests_found = True
+
+                            if not num_guests_found:
+                                # 3. Fallback: parse from hidden text "Số người tối đa: X"
+                                guests_elem = row.find_element(By.CSS_SELECTOR, '.bui-u-sr-only')
                                 guests_text = guests_elem.text.strip()
-                                num_match = re.search(r'(\d+)', guests_text)
+                                num_match = re.search(r'Số người tối đa:\s*(\d+)', guests_text, re.IGNORECASE)
+                                if not num_match:
+                                    num_match = re.search(r'(\d+)\s*người', guests_text, re.IGNORECASE)
                                 if num_match:
                                     room_common_data['num_guests'] = num_match.group(1)
-                            except:
-                                try:
-                                    occupancy = room_type_header.find_elements(By.CSS_SELECTOR, '.bui-icon.bui-icon--adults')
-                                    if occupancy:
-                                        room_common_data['num_guests'] = str(len(occupancy))
-                                except:
-                                    # Try parsing from text like "Giá cho 2 người"
-                                    try:
-                                        price_text = room_type_header.text
-                                        guests_match = re.search(r'Giá cho\s*(\d+)\s*người|(\d+)\s*người', price_text, re.IGNORECASE)
-                                        if guests_match:
-                                            room_common_data['num_guests'] = guests_match.group(1) or guests_match.group(2)
-                                    except:
-                                        pass
+                                    num_guests_found = True
+                            
+                            if not num_guests_found:
+                                # 4. Another fallback specific to some layouts
+                                occupancy = row.find_elements(By.CSS_SELECTOR, '.bui-icon.bui-icon--adults')
+                                if occupancy:
+                                    room_common_data['num_guests'] = str(len(occupancy))
+                        except:
+                            pass
                         
                         # Lấy thông tin giường
                         try:
