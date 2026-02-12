@@ -253,9 +253,21 @@ def scrape_agoda_data(url):
     try:
         service = Service()
         driver = webdriver.Edge(service=service, options=options)
-        driver.set_page_load_timeout(30)
+        driver.set_page_load_timeout(45)
         
-        driver.get(url)
+        # Retry logic for page load (Phase 1: Immediate Retry)
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                driver.get(url)
+                WebDriverWait(driver, 20).until(
+                    EC.presence_of_element_located((By.TAG_NAME, 'body'))
+                )
+                break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    time.sleep(5)
+        
         time.sleep(10)
 
         try:

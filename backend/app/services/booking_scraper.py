@@ -323,8 +323,27 @@ def scrape_booking_data(url):
             service = Service()
         
         driver = webdriver.Edge(service=service, options=options)
-        driver.set_page_load_timeout(30)
-        driver.get(forced_url)
+        driver.set_page_load_timeout(45)
+
+        # Retry logic for page load (Phase 1: Immediate Retry)
+        # Cơ chế thử lại ngay lập tức khi tải trang thất bại (Phase 1)
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # print(f"Loading URL (Attempt {attempt+1}/{max_retries}): {forced_url}")
+                driver.get(forced_url)
+                
+                # Check for successful load
+                WebDriverWait(driver, 20).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, 'h2.pp-header__title, h1, [data-testid="price-and-discounted-price"]'))
+                )
+                break # Success, exit retry loop
+            except Exception as e:
+                # print(f"Attempt {attempt+1} failed: {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(5) # Wait before retry
+                # If last attempt fails, loop will finish and code proceeds below
+                # potentially leading to empty result or further error which is caught by caller
 
         time.sleep(5)
         
