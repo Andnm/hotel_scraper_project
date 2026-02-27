@@ -265,9 +265,25 @@ class CrawlDataRepository:
             try:
                 query = """
                     SELECT 
-                        cd.*,
+                        cd.id,
+                        cd.history_id,
+                        cd.hotel_name,
+                        cd.hotel_link,
+                        cd.popular_facilities,
+                        cd.price_after_discount,
+                        cd.price_original,
+                        cd.discount_percent,
+                        cd.review_count,
+                        cd.review_score,
+                        cd.room_type,
+                        cd.num_people,
+                        cd.bed_info,
+                        cd.room_area,
+                        cd.options,
+                        cd.created_at,
                         ch.crawl_date,
-                        ch.crawl_target
+                        ch.crawl_target,
+                        ch.market
                     FROM crawl_data cd
                     JOIN crawl_history ch ON cd.history_id = ch.id
                     WHERE cd.history_id = %s 
@@ -306,12 +322,28 @@ class CrawlDataRepository:
             try:
                 query = """
                     SELECT 
-                        cd.*,
+                        cd.id,
+                        cd.history_id,
+                        cd.hotel_name,
+                        cd.hotel_link,
+                        cd.popular_facilities,
+                        cd.price_after_discount,
+                        cd.price_original,
+                        cd.discount_percent,
+                        cd.review_count,
+                        cd.review_score,
+                        cd.room_type,
+                        cd.num_people,
+                        cd.bed_info,
+                        cd.room_area,
+                        cd.options,
+                        cd.created_at,
                         ch.crawl_date,
                         ch.crawl_target,
                         ch.check_in,
                         ch.check_out,
-                        ch.scrape_type
+                        ch.scrape_type,
+                        ch.market
                     FROM crawl_data cd
                     JOIN crawl_history ch ON cd.history_id = ch.id
                     WHERE cd.history_id = %s
@@ -336,9 +368,25 @@ class CrawlDataRepository:
             try:
                 query = """
                     SELECT 
-                        cd.*,
+                        cd.id,
+                        cd.history_id,
+                        cd.hotel_name,
+                        cd.hotel_link,
+                        cd.popular_facilities,
+                        cd.price_after_discount,
+                        cd.price_original,
+                        cd.discount_percent,
+                        cd.review_count,
+                        cd.review_score,
+                        cd.room_type,
+                        cd.num_people,
+                        cd.bed_info,
+                        cd.room_area,
+                        cd.options,
+                        cd.created_at,
                         ch.crawl_date,
-                        ch.crawl_target
+                        ch.crawl_target,
+                        ch.market
                     FROM crawl_data cd
                     JOIN crawl_history ch ON cd.history_id = ch.id
                     ORDER BY ch.created_at, cd.id
@@ -367,9 +415,25 @@ class CrawlDataRepository:
             try:
                 query = """
                     SELECT 
-                        cd.*,
+                        cd.id,
+                        cd.history_id,
+                        cd.hotel_name,
+                        cd.hotel_link,
+                        cd.popular_facilities,
+                        cd.price_after_discount,
+                        cd.price_original,
+                        cd.discount_percent,
+                        cd.review_count,
+                        cd.review_score,
+                        cd.room_type,
+                        cd.num_people,
+                        cd.bed_info,
+                        cd.room_area,
+                        cd.options,
+                        cd.created_at,
                         ch.crawl_date,
-                        ch.crawl_target
+                        ch.crawl_target,
+                        ch.market
                     FROM crawl_data cd
                     JOIN crawl_history ch ON cd.history_id = ch.id
                     WHERE 1=1

@@ -217,6 +217,14 @@
                 </div>
               </template>
             </Column>
+            <Column field="Market" header="Market" :style="{ width: '100px' }">
+              <template #body="slotProps">
+                <Tag v-if="slotProps.data.market" severity="secondary">
+                  {{ slotProps.data.market }}
+                </Tag>
+                <span v-else style="color: #999">-</span>
+              </template>
+            </Column>
           </template>
 
           <!-- Price Mode Columns -->
@@ -246,6 +254,14 @@
                 <a :href="slotProps.data.hotel_link" target="_blank" v-if="slotProps.data.hotel_link">
                   <Button icon="pi pi-external-link" text size="small" />
                 </a>
+              </template>
+            </Column>
+            <Column field="Market" header="Market" :style="{ width: '100px' }">
+              <template #body="slotProps">
+                <Tag v-if="slotProps.data.market" severity="secondary">
+                  {{ slotProps.data.market }}
+                </Tag>
+                <span v-else style="color: #999">-</span>
               </template>
             </Column>
           </template>
@@ -441,13 +457,13 @@ async function exportExcel(historyId: number) {
       'Ngày cào', 'Giờ cào', 'Check in', 'Check out',
       'Tên khách sạn', 'Link khách sạn',
       'Số lượng review', 'Điểm review', 'Các tiện nghi được ưa chuộng nhất',
-      'Tên hạng phòng', 'Số lượng người', 'Giường', 'Diện tích phòng', 'Các lựa chọn'
+      'Tên hạng phòng', 'Số lượng người', 'Giường', 'Diện tích phòng', 'Các lựa chọn', 'Market'
     ];
 
     const priceColumns = [
       'Ngày cào', 'Giờ cào', 'Check in', 'Check out',
       'Tên khách sạn', 'Tên hạng phòng', 'Số lượng người',
-      'Giá sau giảm', 'Giá gốc', 'Giảm giá'
+      'Giá sau giảm', 'Giá gốc', 'Giảm giá', 'Market'
     ];
 
     const targetColumns = scrapeType === 'price' ? priceColumns : infoColumns;

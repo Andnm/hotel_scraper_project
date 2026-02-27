@@ -337,7 +337,17 @@
               </a>
             </template>
           </Column>
-          <Column field="Lỗi" header="Lỗi"></Column>
+          <Column field="Lỗi" header="Lỗi">
+            <template #body="slotProps">
+              <div 
+                class="text-ellipsis" 
+                v-tooltip.top="slotProps.data.Lỗi"
+                style="cursor: help; max-width: 400px;"
+              >
+                {{ slotProps.data.Lỗi }}
+              </div>
+            </template>
+          </Column>
         </DataTable>
         <div class="mt-3">
           <Button 
@@ -591,12 +601,18 @@ function downloadExcel() {
           'Ngày cào', 'Giờ cào', 'Check in', 'Check out', 
           'Tên khách sạn', 'Link khách sạn', 
           'Số lượng review', 'Điểm review', 'Các tiện nghi được ưa chuộng nhất',
-          'Tên hạng phòng', 'Số lượng người', 'Giường', 'Diện tích phòng', 'Các lựa chọn'
+          'Tên hạng phòng', 'Số lượng người', 'Giường', 'Diện tích phòng', 'Các lựa chọn', 'Market'
         ];
         
         filteredResults = scraperStore.results.map(item => {
             const newItem: any = {};
-            columns.forEach(col => newItem[col] = item[col]);
+            columns.forEach(col => {
+              if (col === 'Market') {
+                newItem[col] = selectedMarket.value && selectedMarket.value !== 'all' ? selectedMarket.value : '';
+              } else {
+                newItem[col] = item[col];
+              }
+            });
             return newItem;
         });
       } else {
@@ -604,12 +620,18 @@ function downloadExcel() {
         const columns = [
           'Ngày cào', 'Giờ cào', 'Check in', 'Check out',
           'Tên khách sạn', 'Tên hạng phòng', 'Số lượng người',
-          'Giá sau giảm', 'Giá gốc', 'Giảm giá'
+          'Giá sau giảm', 'Giá gốc', 'Giảm giá', 'Market'
         ];
 
         filteredResults = scraperStore.results.map(item => {
             const newItem: any = {};
-            columns.forEach(col => newItem[col] = item[col]);
+            columns.forEach(col => {
+              if (col === 'Market') {
+                newItem[col] = selectedMarket.value && selectedMarket.value !== 'all' ? selectedMarket.value : '';
+              } else {
+                newItem[col] = item[col];
+              }
+            });
             return newItem;
         });
       }

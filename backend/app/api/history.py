@@ -127,6 +127,7 @@ async def export_history_data(history_id: int):
                 'Giá sau giảm': record.get('price_after_discount') if record.get('price_after_discount') else '',
                 'Giá gốc': record.get('price_original') if record.get('price_original') else '',
                 'Giảm giá': record.get('discount_percent') or '',
+                'Market': record.get('market') or '',
                 'scrape_type': record.get('scrape_type', 'info') # Add scrape_type for frontend checking
             })
         
@@ -180,7 +181,8 @@ async def get_history_public_data(history_id: int):
                     'Số lượng người': record.get('num_people') if record.get('num_people') else '',
                     'Giường': record.get('bed_info') or '',
                     'Diện tích phòng': record.get('room_area') or '',
-                    'Các lựa chọn': options.get('facilities', '')
+                    'Các lựa chọn': options.get('facilities', ''),
+                    'Market': record.get('market') or ''
                 })
             else:
                 # Price-specific columns
@@ -191,6 +193,7 @@ async def get_history_public_data(history_id: int):
                     'Giá sau giảm': record.get('price_after_discount') if record.get('price_after_discount') else '',
                     'Giá gốc': record.get('price_original') if record.get('price_original') else '',
                     'Giảm giá': record.get('discount_percent') or '',
+                    'Market': record.get('market') or ''
                 })
         
         return formatted_records
@@ -266,7 +269,8 @@ async def get_api_data(
                 'Số lượng người': record.get('num_people') if record.get('num_people') else '',
                 'Giường': record.get('bed_info') or '',
                 'Diện tích phòng': record.get('room_area') or '',
-                'Các lựa chọn': options.get('facilities', '')
+                'Các lựa chọn': options.get('facilities', ''),
+                'Market': record.get('market') or ''
             })
         
         return formatted_records
