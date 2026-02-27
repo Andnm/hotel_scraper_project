@@ -77,46 +77,95 @@
               <Tag severity="info">Market: {{ selectedMarket }}</Tag>
             </span>
           </template>
-      <template #content>
-        <DataTable 
-          :value="displayLinks" 
-          :paginator="true" 
-          :rows="10" 
-          :rowsPerPageOptions="[10, 25, 50, 100]"
-          paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink JumpToPageInput CurrentPageReport RowsPerPageDropdown"
-          currentPageReportTemplate="Trang {currentPage}/{totalPages} | Hiển thị {first}-{last} / {totalRecords} links"
-          responsiveLayout="scroll"
-        >
-          <Column field="row" header="Hàng" :style="{ width: '80px' }"></Column>
-          <Column field="market" header="Market" :style="{ width: '120px' }">
-            <template #body="slotProps">
-              <Tag severity="info">{{ slotProps.data.market }}</Tag>
-            </template>
-          </Column>
-          <Column field="cell_value" header="Tên/Giá trị">
-            <template #body="slotProps">
-              {{ truncate(slotProps.data.cell_value, 60) }}
-            </template>
-          </Column>
-          <Column field="link" header="Link">
-            <template #body="slotProps">
-              <a :href="slotProps.data.link" target="_blank" class="link-text">
-                {{ truncate(slotProps.data.link, 80) }}
-              </a>
-            </template>
-          </Column>
-          <Column field="status" header="Trạng thái" :style="{ width: '150px' }">
-            <template #body="slotProps">
-              <Tag v-if="!slotProps.data.is_valid" severity="danger">❌ Không hợp lệ</Tag>
-              <Tag v-else-if="slotProps.data.status" :severity="getStatusSeverity(slotProps.data.status)">
-                {{ slotProps.data.status }}
-              </Tag>
-              <Tag v-else severity="info">Chưa cào</Tag>
-            </template>
-          </Column>
-        </DataTable>
-      </template>
-    </Card>
+          <template #content>
+            <!-- Valid Links Table -->
+            <div v-if="validLinks.length > 0" class="mb-4">
+              <h4 class="section-subtitle">✅ Links hợp lệ ({{ validLinksCount }})</h4>
+              <DataTable 
+                :value="validLinks" 
+                :paginator="true" 
+                :rows="10" 
+                :rowsPerPageOptions="[10, 25, 50, 100]"
+                paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink JumpToPageInput CurrentPageReport RowsPerPageDropdown"
+                currentPageReportTemplate="Trang {currentPage}/{totalPages} | Hiển thị {first}-{last} / {totalRecords} links"
+                responsiveLayout="scroll"
+              >
+                <Column field="market" header="Market" :style="{ width: '120px' }">
+                  <template #body="slotProps">
+                    <Tag severity="info">{{ slotProps.data.market }}</Tag>
+                  </template>
+                </Column>
+                <Column field="cell_value" header="Tên/Giá trị">
+                  <template #body="slotProps">
+                    {{ truncate(slotProps.data.cell_value, 60) }}
+                  </template>
+                </Column>
+                <Column field="link" header="Link">
+                  <template #body="slotProps">
+                    <a :href="slotProps.data.link" target="_blank" class="link-text">
+                      {{ truncate(slotProps.data.link, 80) }}
+                    </a>
+                  </template>
+                </Column>
+                <Column field="status" header="Trạng thái" :style="{ width: '150px' }">
+                  <template #body="slotProps">
+                    <Tag v-if="slotProps.data.status" :severity="getStatusSeverity(slotProps.data.status)">
+                      {{ slotProps.data.status }}
+                    </Tag>
+                    <Tag v-else severity="info">Chưa cào</Tag>
+                  </template>
+                </Column>
+              </DataTable>
+            </div>
+
+            <!-- Invalid Links Table -->
+            <div v-if="invalidLinks.length > 0">
+              <h4 class="section-subtitle">❌ Links không hợp lệ ({{ invalidLinksCount }})</h4>
+              <DataTable 
+                :value="invalidLinks" 
+                :paginator="true" 
+                :rows="10" 
+                :rowsPerPageOptions="[10, 25, 50, 100]"
+                paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink JumpToPageInput CurrentPageReport RowsPerPageDropdown"
+                currentPageReportTemplate="Trang {currentPage}/{totalPages} | Hiển thị {first}-{last} / {totalRecords} links"
+                responsiveLayout="scroll"
+                severity="danger"
+              >
+                <Column field="market" header="Market" :style="{ width: '120px' }">
+                  <template #body="slotProps">
+                    <Tag severity="info">{{ slotProps.data.market }}</Tag>
+                  </template>
+                </Column>
+                <Column field="cell_value" header="Tên/Giá trị">
+                  <template #body="slotProps">
+                    {{ truncate(slotProps.data.cell_value, 60) }}
+                  </template>
+                </Column>
+                <Column field="link" header="Link">
+                  <template #body="slotProps">
+                    <span class="invalid-link-text">
+                      {{ truncate(slotProps.data.link, 80) }}
+                    </span>
+                  </template>
+                </Column>
+                <Column field="status" header="Lý do" :style="{ width: '200px' }">
+                  <template #body="slotProps">
+                    <Tag severity="danger">❌ Không hợp lệ</Tag>
+                  </template>
+                </Column>
+              </DataTable>
+              <div class="mt-3">
+                <Button 
+                  label="Tải xuống Excel (Links không hợp lệ)" 
+                  icon="pi pi-download"
+                  @click="downloadInvalidLinksExcel"
+                  class="p-button-danger"
+                  size="small"
+                />
+              </div>
+            </div>
+          </template>
+        </Card>
 
     <!-- Step 4: Date Range Picker -->
     <Card v-if="displayLinks.length > 0" class="mb-4" ref="step4">
@@ -259,8 +308,15 @@
     <Card v-if="scraperStore.errors.length > 0 && !scraperStore.isScraing" class="mb-4">
       <template #title>❌ Danh sách lỗi ({{ scraperStore.errorCount }})</template>
       <template #content>
-        <DataTable :value="scraperStore.errors" responsiveLayout="scroll">
-          <Column field="Hàng" header="Hàng" :style="{ width: '80px' }"></Column>
+        <DataTable 
+          :value="scraperStore.errors" 
+          :paginator="true" 
+          :rows="10" 
+          :rowsPerPageOptions="[10, 20, 50, 100]"
+          paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink JumpToPageInput CurrentPageReport RowsPerPageDropdown"
+          currentPageReportTemplate="Trang {currentPage}/{totalPages} | Hiển thị {first}-{last} / {totalRecords} lỗi"
+          responsiveLayout="scroll"
+        >
           <Column field="Tên" header="Tên"></Column>
           <Column field="Link" header="Link">
             <template #body="slotProps">
@@ -271,6 +327,15 @@
           </Column>
           <Column field="Lỗi" header="Lỗi"></Column>
         </DataTable>
+        <div class="mt-3">
+          <Button 
+            label="Tải xuống Excel (Danh sách lỗi)" 
+            icon="pi pi-download"
+            @click="downloadErrorsExcel"
+            class="p-button-danger"
+            size="small"
+          />
+        </div>
       </template>
     </Card>
 
@@ -377,13 +442,18 @@ const displayLinks = computed(() => {
   return allLinks.value.filter(link => link.market === selectedMarket.value)
 })
 
-const validLinksCount = computed(() => 
-  displayLinks.value.filter(l => l.is_valid).length
+// Separate valid and invalid links
+const validLinks = computed(() => 
+  displayLinks.value.filter(l => l.is_valid)
 )
 
-const invalidLinksCount = computed(() => 
-  displayLinks.value.filter(l => !l.is_valid).length
+const invalidLinks = computed(() => 
+  displayLinks.value.filter(l => !l.is_valid)
 )
+
+const validLinksCount = computed(() => validLinks.value.length)
+
+const invalidLinksCount = computed(() => invalidLinks.value.length)
 
 function handleDataLoaded(data: { markets: string[], links: LinkInfo[], total_links: number, source_id?: number }) {
   // Store all links and markets
@@ -417,9 +487,9 @@ function handleDateRangesUpdated(ranges: DateRange[]) {
 
 async function startScraping() {
   try {
-    const validLinks = displayLinks.value.filter(l => l.is_valid)
+    const validLinksArray = validLinks.value
     
-    if (validLinks.length === 0) {
+    if (validLinksArray.length === 0) {
       toast.add({
         severity: 'warn',
         summary: 'Cảnh báo',
@@ -466,7 +536,7 @@ async function startScraping() {
     })
 
     const request = {
-      links: validLinks,
+      links: validLinksArray,
       date_ranges: scraperStore.dateRanges,
       source: scraperStore.selectedSource,
       scrape_type: scrapeType.value,
@@ -566,6 +636,110 @@ function downloadExcel() {
   }
 }
 
+function downloadInvalidLinksExcel() {
+  try {
+    import('xlsx').then((XLSX) => {
+      // Chuẩn bị data cho Excel
+      const excelData = invalidLinks.value.map(link => ({
+        'Market': link.market,
+        'Tên/Giá trị': link.cell_value,
+        'Link': link.link,
+        'Trạng thái': 'Không hợp lệ',
+        'Lý do': 'Link không đúng định dạng hoặc không hợp lệ'
+      }))
+
+      // Tạo worksheet từ data
+      const ws = XLSX.utils.json_to_sheet(excelData)
+      
+      // Tự động điều chỉnh độ rộng cột
+      const colWidths = [
+        { wch: 15 },  // Market
+        { wch: 40 },  // Tên/Giá trị
+        { wch: 60 },  // Link
+        { wch: 15 },  // Trạng thái
+        { wch: 50 }   // Lý do
+      ]
+      ws['!cols'] = colWidths
+      
+      // Tạo workbook
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Links không hợp lệ')
+      
+      // Tạo filename với timestamp
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+      const market = selectedMarket.value && selectedMarket.value !== 'all' ? `_${selectedMarket.value}` : ''
+      const filename = `invalid_links${market}_${timestamp}.xlsx`
+      
+      // Download file
+      XLSX.writeFile(wb, filename)
+      
+      toast.add({
+        severity: 'success',
+        summary: 'Thành công',
+        detail: `Đã tải xuống ${invalidLinks.value.length} links không hợp lệ`,
+        life: 3000
+      })
+    })
+  } catch (error: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: 'Không thể tải xuống Excel: ' + error.message,
+      life: 5000
+    })
+  }
+}
+
+function downloadErrorsExcel() {
+  try {
+    import('xlsx').then((XLSX) => {
+      // Chuẩn bị data cho Excel
+      const excelData = scraperStore.errors.map(error => ({
+        'Tên': error.Tên,
+        'Link': error.Link,
+        'Lỗi': error.Lỗi
+      }))
+
+      // Tạo worksheet từ data
+      const ws = XLSX.utils.json_to_sheet(excelData)
+      
+      // Tự động điều chỉnh độ rộng cột
+      const colWidths = [
+        { wch: 40 },  // Tên
+        { wch: 60 },  // Link
+        { wch: 50 }   // Lỗi
+      ]
+      ws['!cols'] = colWidths
+      
+      // Tạo workbook
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Danh sách lỗi')
+      
+      // Tạo filename với timestamp
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+      const market = selectedMarket.value && selectedMarket.value !== 'all' ? `_${selectedMarket.value}` : ''
+      const filename = `errors${market}_${timestamp}.xlsx`
+      
+      // Download file
+      XLSX.writeFile(wb, filename)
+      
+      toast.add({
+        severity: 'success',
+        summary: 'Thành công',
+        detail: `Đã tải xuống ${scraperStore.errors.length} lỗi`,
+        life: 3000
+      })
+    })
+  } catch (error: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: 'Không thể tải xuống Excel: ' + error.message,
+      life: 5000
+    })
+  }
+}
+
 function saveHistory() {
   // TODO: Implement save to database
   toast.add({
@@ -600,6 +774,10 @@ function getStatusSeverity(status: string): string {
   margin-bottom: 1.5rem;
 }
 
+.mt-3 {
+  margin-top: 1rem;
+}
+
 .mt-4 {
   margin-top: 1.5rem;
 }
@@ -623,6 +801,21 @@ function getStatusSeverity(status: string): string {
 
 .link-text:hover {
   text-decoration: underline;
+}
+
+.invalid-link-text {
+  color: #dc2626;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.section-subtitle {
+  margin: 0 0 1rem 0;
+  padding: 0.5rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-color);
+  border-bottom: 2px solid var(--surface-border);
 }
 
 .text-ellipsis {

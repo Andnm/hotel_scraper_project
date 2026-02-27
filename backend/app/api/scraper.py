@@ -141,10 +141,11 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                         'hotel_name': link_info.get('cell_value', 'Unknown'),
                         'row': row_num
                     }, websocket)
-                    
+
+                    #Trigger debug mode nếu muốn tải html để debug
                     try:
                         if source == 'booking':
-                            data, error_msg = scrape_booking_data(url)
+                            data, error_msg = scrape_booking_data(url, debug_mode=False, row_num=row_num)
                         else:
                             data, error_msg = scrape_agoda_data(url)
                         
@@ -229,17 +230,27 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                                     'rooms_count': len(data['rooms'])
                                 }, websocket)
                             else:
-                                # No room data found - thêm vào retry queue luôn thay vì error ngay
-                                # Vì đôi khi mạng lag khiến trang load xong nhưng ko có data
-                                print(f"[Main Loop] No Rooms Found: {url}. Adding to retry queue.")
+                                # No room data found - CHỈ thêm vào retry queue, KHÔNG thêm vào results
+                                # Để tránh duplicate khi retry
+                                print(f"[Main Loop] No Rooms Found: {url}. Adding to retry queue only.")
+                                
+                                # Thêm vào retry queue để thử lại
                                 failed_retry_queue.append({
                                     'link_info': link_info,
                                     'url': url,
                                     'row_num': row_num,
                                     'date_idx': date_idx,
                                     'date_range': date_range,
-                                    'original_error': "No room data found"
+                                    'original_error': "No room data found",
+                                    'has_hotel_info': True,  # Đánh dấu có thông tin KS
+                                    'hotel_data': data  # Lưu data để dùng sau
                                 })
+                                
+                                await manager.send_personal_message({
+                                    'type': 'warning',
+                                    'message': f'Không tìm thấy phòng, sẽ thử lại sau',
+                                    'row': row_num
+                                }, websocket)
                                 
                     except Exception as e:
                         # Thêm vào retry queue khi có Exception
@@ -295,15 +306,14 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                     try:
                         # Retry scraping
                         if source == 'booking':
-                            data, error_msg = scrape_booking_data(url)
+                            data, error_msg = scrape_booking_data(url, debug_mode=False, row_num=row_num)
                         else:
                             data, error_msg = scrape_agoda_data(url)
                         
                         if error_msg:
-                            # Final failure -> Add to error list
+                            # Final failure -> Add to error list and results
                             print(f"[Retry Phase] Final Failure: {url}. Error: {error_msg}")
                             errors.append({
-                                'Hàng': row_num,
                                 'Tên': item['link_info'].get('cell_value', ''),
                                 'Link': url,
                                 'Lỗi': f"Lỗi sau khi thử lại: {error_msg}"
@@ -313,8 +323,48 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                                 'message': f"Thất bại vĩnh viễn: {error_msg}",
                                 'row': row_num
                             }, websocket)
-                            # Add empty row for final failure
-                            results.append({
+                            
+                            # Add row with hotel info if available, otherwise empty
+                            saved_hotel_data = item.get('hotel_data')
+                            if saved_hotel_data:
+                                popular_fac_list = saved_hotel_data.get('popular_facilities', [])
+                                popular_fac_text = ', '.join(popular_fac_list) if popular_fac_list else ''
+                                
+                                common_data = {
+                                    'Hàng_gốc': row_num,
+                                    'Ngày cào': datetime.now().strftime('%Y-%m-%d'),
+                                    'Giờ cào': datetime.now().strftime('%H:%M:%S'),
+                                    'Check in': checkin_date,
+                                    'Check out': checkout_date,
+                                    'Tên khách sạn': saved_hotel_data.get('hotel_name', ''),
+                                    'Tên hạng phòng': '',
+                                    'Số lượng người': ''
+                                }
+                                
+                                if scrape_type == 'info':
+                                    results.append({
+                                        **common_data,
+                                        'Link khách sạn': url,
+                                        'Số lượng review': saved_hotel_data.get('review_count', ''),
+                                        'Điểm review': saved_hotel_data.get('rating', ''),
+                                        'Các tiện nghi được ưa chuộng nhất': popular_fac_text,
+                                        'Giường': '',
+                                        'Diện tích phòng': '',
+                                        'Các lựa chọn': '',
+                                        'Ngày cần cào': target_date_str
+                                    })
+                                else:
+                                    results.append({
+                                        **common_data,
+                                        'Giá sau giảm': '',
+                                        'Giá gốc': '',
+                                        'Giảm giá': '',
+                                        'Ngày cần cào': target_date_str,
+                                        'Link khách sạn': url
+                                    })
+                            else:
+                                # No hotel data available - add completely empty row
+                                results.append({
                                     'Hàng_gốc': row_num,
                                     'Ngày cào': datetime.now().strftime('%Y-%m-%d'),
                                     'Ngày cần cào': target_date_str,
@@ -390,11 +440,58 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                                 'row': row_num,
                                 'rooms_count': len(data['rooms'])
                             }, websocket)
+                        elif data or item.get('hotel_data'):
+                             # No rooms but has hotel info (from retry or saved from first attempt)
+                             # Use retry data if available, otherwise use saved data
+                             hotel_info = data if data else item.get('hotel_data')
+                             print(f"[Retry Phase] No rooms but has hotel info: {url}")
+                             
+                             popular_fac_list = hotel_info.get('popular_facilities', [])
+                             popular_fac_text = ', '.join(popular_fac_list) if popular_fac_list else ''
+                             
+                             common_data = {
+                                 'Hàng_gốc': row_num,
+                                 'Ngày cào': datetime.now().strftime('%Y-%m-%d'),
+                                 'Giờ cào': datetime.now().strftime('%H:%M:%S'),
+                                 'Check in': checkin_date,
+                                 'Check out': checkout_date,
+                                 'Tên khách sạn': hotel_info.get('hotel_name', ''),
+                                 'Tên hạng phòng': '',
+                                 'Số lượng người': ''
+                             }
+                             
+                             if scrape_type == 'info':
+                                 results.append({
+                                     **common_data,
+                                     'Link khách sạn': url,
+                                     'Số lượng review': hotel_info.get('review_count', ''),
+                                     'Điểm review': hotel_info.get('rating', ''),
+                                     'Các tiện nghi được ưa chuộng nhất': popular_fac_text,
+                                     'Giường': '',
+                                     'Diện tích phòng': '',
+                                     'Các lựa chọn': '',
+                                     'Ngày cần cào': target_date_str
+                                 })
+                             else:
+                                 results.append({
+                                     **common_data,
+                                     'Giá sau giảm': '',
+                                     'Giá gốc': '',
+                                     'Giảm giá': '',
+                                     'Ngày cần cào': target_date_str,
+                                     'Link khách sạn': url
+                                 })
+                             
+                             # Add to errors list for tracking
+                             errors.append({
+                                'Tên': item['link_info'].get('cell_value', ''),
+                                'Link': url,
+                                'Lỗi': "No room data found after retry (hotel info saved)"
+                             })
                         else:
                              # Empty data on retry
                              print(f"[Retry Phase] No data on retry: {url}")
                              errors.append({
-                                'Hàng': row_num,
                                 'Tên': item['link_info'].get('cell_value', ''),
                                 'Link': url,
                                 'Lỗi': "No room data found (Retry failed)"
@@ -425,7 +522,6 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                         # Ensure final failure is recorded
                         print(f"[Retry Phase] Final Exception: {url}. Error: {str(e)}")
                         errors.append({
-                            'Hàng': row_num,
                             'Tên': item['link_info'].get('cell_value', ''),
                             'Link': url,
                             'Lỗi': f"Lỗi ngoại lệ khi thử lại: {str(e)}"

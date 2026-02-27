@@ -73,7 +73,7 @@ def get_driver(is_headless=True):
         }
         options.add_experimental_option("prefs", prefs)
         
-        # Better: use webdriver_manager in code to be safe
+        # Use webdriver_manager to automatically download the driver
         from webdriver_manager.chrome import ChromeDriverManager
         service = ChromeService(ChromeDriverManager().install())
         
@@ -106,7 +106,75 @@ def get_driver(is_headless=True):
             
         return driver
     else:
-        # Use Edge locally (Windows)
+        # Use Chrome locally (Windows) with fallback to Edge
+        driver = None
+        last_error = None
+        
+        # Try Chrome first (more reliable CDN)
+        try:
+            from webdriver_manager.chrome import ChromeDriverManager
+            if not is_headless:
+                temp_dir = tempfile.mkdtemp(prefix='selenium_booking_')
+            
+            options = ChromeOptions()
+            if is_headless:
+                options.add_argument('--headless=new')
+                
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--disable-gpu')
+            options.add_argument('--lang=vi-VN')
+            options.add_argument(f'user-agent={get_random_user_agent()}')
+            
+            # Anti-detection arguments
+            options.add_argument('--disable-blink-features=AutomationControlled')
+            options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            options.add_experimental_option('useAutomationExtension', False)
+            options.add_argument('--disable-web-security')
+            
+            # Location and language preferences
+            prefs = {
+                "profile.default_content_setting_values.geolocation": 1,
+                "profile.managed_default_content_settings.geolocation": 1,
+                "intl.accept_languages": "vi-VN,vi,en",
+                "profile.default_content_settings.popups": 0
+            }
+            options.add_experimental_option("prefs", prefs)
+            
+            # Install ChromeDriver
+            service = ChromeService(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=options)
+            
+            # Remove automation indicators
+            driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            
+            # Apply GPS spoofing
+            try:
+                driver.execute_cdp_cmd("Emulation.setGeolocationOverride", {
+                    "latitude": 21.028511,
+                    "longitude": 105.854164,
+                    "accuracy": 100
+                })
+                
+                driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {
+                    "timezoneId": "Asia/Ho_Chi_Minh"
+                })
+                
+                driver.execute_cdp_cmd("Emulation.setLocaleOverride", {
+                    "locale": "vi-VN"
+                })
+                
+            except Exception as e:
+                pass
+            
+            return driver
+            
+        except Exception as chrome_error:
+            last_error = chrome_error
+            print(f"⚠️ Chrome driver failed: {chrome_error}")
+            print("🔄 Trying Edge as fallback...")
+        
+        # Fallback to Edge if Chrome fails
         try:
             from webdriver_manager.microsoft import EdgeChromiumDriverManager
             if not is_headless:
@@ -137,6 +205,7 @@ def get_driver(is_headless=True):
             }
             options.add_experimental_option("prefs", prefs)
             
+            # Install EdgeDriver
             service = EdgeService(EdgeChromiumDriverManager().install())
             driver = webdriver.Edge(service=service, options=options)
             
@@ -162,9 +231,12 @@ def get_driver(is_headless=True):
             except Exception as e:
                 pass
             
+            print("✅ Edge driver initialized successfully")
             return driver
-        except Exception as e:
-            raise Exception(f"Failed to initialize Edge driver: {e}")
+            
+        except Exception as edge_error:
+            print(f"❌ Edge driver also failed: {edge_error}")
+            raise Exception(f"Failed to initialize browser driver. Chrome error: {last_error}. Edge error: {edge_error}")
 
 def is_booking_link(text):
     if pd.isna(text) or text is None:
@@ -427,7 +499,7 @@ def check_date_outdated(url):
         return False, None
 
 
-def scrape_booking_data(url):
+def scrape_booking_data(url, debug_mode=False, row_num=None):
     if not SELENIUM_AVAILABLE:
         return None, "Selenium chưa được cài đặt. Vui lòng chạy: pip install selenium webdriver-manager"
     
@@ -503,7 +575,6 @@ def scrape_booking_data(url):
                 WebDriverWait(driver, 30).until(  # Longer wait with proxy
                     EC.presence_of_element_located((By.CSS_SELECTOR, 'h2.pp-header__title, h1, [data-testid="price-and-discounted-price"]'))
                 )
-                print(f"Page loaded successfully on attempt {attempt+1}")
                 break # Success, exit retry loop
             except Exception as e:
                 print(f"Attempt {attempt+1} failed: {str(e)}")
@@ -534,6 +605,25 @@ def scrape_booking_data(url):
             pass
         
         time.sleep(3)
+        
+        # Save HTML for debugging if debug_mode is enabled
+        if debug_mode:
+            try:
+                # Create debug_html folder if not exists
+                debug_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'debug_html')
+                os.makedirs(debug_folder, exist_ok=True)
+                
+                # Generate filename with timestamp and row number
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                row_suffix = f"_row{row_num}" if row_num else ""
+                filename = f"debug_link{row_suffix}_{timestamp}.html"
+                filepath = os.path.join(debug_folder, filename)
+                
+                # Save page source
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(driver.page_source)
+            except Exception as e:
+                pass
         
         result = {
             'hotel_name': None,
@@ -798,16 +888,46 @@ def scrape_booking_data(url):
                         
                         # Lấy thông tin giường
                         try:
-                            bed_config_elems = room_type_header.find_elements(By.CSS_SELECTOR, '.hprt-roomtype-bed')
-                            for bed_elem in bed_config_elems:
-                                bed_text = bed_elem.text.strip()
-                                if bed_text:
-                                    lines = bed_text.split('\n')
-                                    for line in lines:
-                                        line = line.strip()
-                                        if line and 'Chọn giường' not in line and 'tùy tình trạng' not in line:
-                                            room_common_data['bed_options'].append(line)
-                        except:
+                            # PRIORITY 1: Wholesalers table layout (TPI/B.V. layout)
+                            bed_items = room_type_header.find_elements(By.CSS_SELECTOR, '.wholesalers_table__bed_options__text')
+                            if bed_items:
+                                for bed_item in bed_items:
+                                    bed_text = bed_item.text.strip()
+                                    # Remove SVG icon text if any
+                                    bed_text = re.sub(r'<svg.*?</svg>', '', bed_text, flags=re.DOTALL)
+                                    bed_text = bed_text.strip()
+                                    if bed_text and 'Chọn giường' not in bed_text and 'tùy tình trạng' not in bed_text:
+                                        room_common_data['bed_options'].append(bed_text)
+                            
+                            # PRIORITY 2: Standard rt-bed-types layout
+                            if not room_common_data['bed_options']:
+                                bed_items = room_type_header.find_elements(By.CSS_SELECTOR, '.rt-bed-types .rt-bed-type span')
+                                if bed_items:
+                                    for bed_item in bed_items:
+                                        bed_text = bed_item.text.strip()
+                                        if bed_text and 'Chọn giường' not in bed_text and 'tùy tình trạng' not in bed_text:
+                                            room_common_data['bed_options'].append(bed_text)
+                            
+                            # PRIORITY 3: Direct rt-bed-type elements
+                            if not room_common_data['bed_options']:
+                                bed_items = room_type_header.find_elements(By.CSS_SELECTOR, '.rt-bed-type')
+                                for bed_item in bed_items:
+                                    bed_text = bed_item.text.strip()
+                                    if bed_text and 'Chọn giường' not in bed_text and 'tùy tình trạng' not in bed_text:
+                                        room_common_data['bed_options'].append(bed_text)
+                            
+                            # PRIORITY 4: Fallback - hprt-roomtype-bed wrapper
+                            if not room_common_data['bed_options']:
+                                bed_config_elems = room_type_header.find_elements(By.CSS_SELECTOR, '.hprt-roomtype-bed')
+                                for bed_elem in bed_config_elems:
+                                    bed_text = bed_elem.text.strip()
+                                    if bed_text:
+                                        lines = bed_text.split('\n')
+                                        for line in lines:
+                                            line = line.strip()
+                                            if line and 'Chọn giường' not in line and 'tùy tình trạng' not in line:
+                                                room_common_data['bed_options'].append(line)
+                        except Exception as e:
                             pass
                         
                         # Lấy diện tích phòng (Enhanced for Vietnamese market)
@@ -1110,6 +1230,8 @@ def scrape_booking_data(url):
             print(f"Room extraction error: {str(e)}")
             pass
         
+        # Luôn trả về result ngay cả khi không có phòng
+        # Frontend/API sẽ quyết định xử lý như thế nào
         return result, None
         
     except Exception as e:
