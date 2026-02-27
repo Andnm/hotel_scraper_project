@@ -95,6 +95,12 @@
                     <Tag severity="info">{{ slotProps.data.market }}</Tag>
                   </template>
                 </Column>
+                <Column field="hotel_name" header="Tên khách sạn" :style="{ width: '200px' }">
+                  <template #body="slotProps">
+                    <span v-if="slotProps.data.hotel_name">{{ truncate(slotProps.data.hotel_name, 50) }}</span>
+                    <span v-else style="color: var(--text-color-secondary); font-style: italic;">Không có</span>
+                  </template>
+                </Column>
                 <Column field="cell_value" header="Tên/Giá trị">
                   <template #body="slotProps">
                     {{ truncate(slotProps.data.cell_value, 60) }}
@@ -134,6 +140,12 @@
                 <Column field="market" header="Market" :style="{ width: '120px' }">
                   <template #body="slotProps">
                     <Tag severity="info">{{ slotProps.data.market }}</Tag>
+                  </template>
+                </Column>
+                <Column field="hotel_name" header="Tên khách sạn" :style="{ width: '200px' }">
+                  <template #body="slotProps">
+                    <span v-if="slotProps.data.hotel_name">{{ truncate(slotProps.data.hotel_name, 50) }}</span>
+                    <span v-else style="color: var(--text-color-secondary); font-style: italic;">Không có</span>
                   </template>
                 </Column>
                 <Column field="cell_value" header="Tên/Giá trị">
@@ -642,6 +654,7 @@ function downloadInvalidLinksExcel() {
       // Chuẩn bị data cho Excel
       const excelData = invalidLinks.value.map(link => ({
         'Market': link.market,
+        'Tên khách sạn': link.hotel_name || '',
         'Tên/Giá trị': link.cell_value,
         'Link': link.link,
         'Trạng thái': 'Không hợp lệ',
@@ -654,6 +667,7 @@ function downloadInvalidLinksExcel() {
       // Tự động điều chỉnh độ rộng cột
       const colWidths = [
         { wch: 15 },  // Market
+        { wch: 30 },  // Tên khách sạn
         { wch: 40 },  // Tên/Giá trị
         { wch: 60 },  // Link
         { wch: 15 },  // Trạng thái

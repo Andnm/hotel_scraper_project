@@ -73,9 +73,11 @@ def get_driver(is_headless=True):
         }
         options.add_experimental_option("prefs", prefs)
         
-        # Use webdriver_manager to automatically download the driver
+        # Use webdriver_manager
         from webdriver_manager.chrome import ChromeDriverManager
-        service = ChromeService(ChromeDriverManager().install())
+        from webdriver_manager.core.os_manager import ChromeType
+        
+        service = ChromeService(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
         
         driver = webdriver.Chrome(service=service, options=options)
         
@@ -141,7 +143,6 @@ def get_driver(is_headless=True):
             }
             options.add_experimental_option("prefs", prefs)
             
-            # Install ChromeDriver
             service = ChromeService(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=options)
             
@@ -274,36 +275,30 @@ def extract_hyperlinks_from_excel(file_bytes, market=None):
             sheets_to_process = [(sheet_name, wb[sheet_name]) for sheet_name in wb.sheetnames]
         
         for sheet_name, ws in sheets_to_process:
-            for col_idx in [1, 2, 3]:
-                for row_idx in range(1, ws.max_row + 1):
-                    cell = ws.cell(row=row_idx, column=col_idx)
+            # Chỉ lấy link từ cột B (col_idx = 2)
+            for row_idx in range(1, ws.max_row + 1):
+                cell_b = ws.cell(row=row_idx, column=2)  # Cột B
+                cell_a = ws.cell(row=row_idx, column=1)  # Cột A (tên khách sạn)
 
-                    if cell.hyperlink and cell.hyperlink.target:
-                        link = cell.hyperlink.target
-                        is_valid = is_booking_link(link)
+                # Lấy giá trị text trực tiếp từ cột B
+                if cell_b.value:
+                    cell_text = str(cell_b.value).strip()
+                    if 'http' in cell_text.lower() or 'www.' in cell_text.lower():
+                        is_valid = is_booking_link(cell_text)
+                        
+                        # Lấy tên khách sạn từ cột A
+                        hotel_name = str(cell_a.value).strip() if cell_a.value else ''
+                        
                         links_info.append({
                             'row': row_idx,
-                            'col': chr(64 + col_idx),
-                            'link': link.strip(),
-                            'cell_value': str(cell.value) if cell.value else '',
+                            'col': 'B',
+                            'link': cell_text,
+                            'cell_value': cell_text,
+                            'hotel_name': hotel_name,
                             'is_valid': is_valid,
                             'market': sheet_name,
-                            'note': '' if is_valid else '⚠️Link không hợp lệ'
+                            'note': '' if is_valid else 'Link không hợp lệ'
                         })
-
-                    elif cell.value:
-                        cell_text = str(cell.value).strip()
-                        if 'http' in cell_text.lower() or 'www.' in cell_text.lower():
-                            is_valid = is_booking_link(cell_text)
-                            links_info.append({
-                                'row': row_idx,
-                                'col': chr(64 + col_idx),
-                                'link': cell_text,
-                                'cell_value': cell_text,
-                                'is_valid': is_valid,
-                                'market': sheet_name,
-                                'note': '' if is_valid else '⚠️Link không hợp lệ'
-                            })
         
         return links_info
     except Exception as e:
@@ -314,41 +309,36 @@ def extract_hyperlinks_from_excel(file_bytes, market=None):
 def find_booking_links(df):
     links_info = []
     
-    for col_idx in [0, 1, 2]:
-        if col_idx < len(df.columns):
-            col_name = df.columns[col_idx]
-            for row_idx, value in enumerate(df[col_name]):
-                if pd.isna(value) or value is None:
-                    continue
-                    
-                value_str = str(value).strip()
+    # Chỉ lấy link từ cột B (index 1)
+    if len(df.columns) > 1:
+        col_b = df.columns[1]  # Cột B
+        col_a = df.columns[0] if len(df.columns) > 0 else None  # Cột A (tên khách sạn)
+        
+        for row_idx, value in enumerate(df[col_b]):
+            if pd.isna(value) or value is None:
+                continue
+                
+            value_str = str(value).strip()
+            
+            # Lấy tên khách sạn từ cột A
+            hotel_name = ''
+            if col_a is not None:
+                hotel_value = df[col_a].iloc[row_idx]
+                if not pd.isna(hotel_value) and hotel_value is not None:
+                    hotel_name = str(hotel_value).strip()
 
-                if value_str.startswith('=HYPERLINK('):
-                    match = re.search(r'=HYPERLINK\("([^"]+)"', value_str)
-                    if match:
-                        url = match.group(1)
-                        is_valid = is_booking_link(url)
-                        text_match = re.search(r',\s*"([^"]+)"\)', value_str)
-                        display_text = text_match.group(1) if text_match else url
-                        links_info.append({
-                            'row': row_idx + 1,
-                            'col': chr(65 + col_idx),
-                            'link': url.strip(),
-                            'cell_value': display_text,
-                            'is_valid': is_valid,
-                            'note': '' if is_valid else '⚠️Link không hợp lệ'
-                        })
-
-                elif 'http' in value_str.lower() or 'www.' in value_str.lower():
-                    is_valid = is_booking_link(value_str)
-                    links_info.append({
-                        'row': row_idx + 1,
-                        'col': chr(65 + col_idx),
-                        'link': value_str,
-                        'cell_value': value_str,
-                        'is_valid': is_valid,
-                        'note': '' if is_valid else '⚠️Link không hợp lệ'
-                    })
+            # Chỉ lấy text value trực tiếp, không parse HYPERLINK formula
+            if 'http' in value_str.lower() or 'www.' in value_str.lower():
+                is_valid = is_booking_link(value_str)
+                links_info.append({
+                    'row': row_idx + 1,
+                    'col': 'B',
+                    'link': value_str,
+                    'cell_value': value_str,
+                    'hotel_name': hotel_name,
+                    'is_valid': is_valid,
+                    'note': '' if is_valid else '⚠️Link không hợp lệ'
+                })
     
     return links_info
 
@@ -392,33 +382,27 @@ def load_google_sheet(url):
 
                 for row_idx, tr in enumerate(soup.find_all('tr'), 1):
                     cells = tr.find_all('td')
-                    for col_idx in range(min(3, len(cells))):
-                        cell = cells[col_idx]
+                    # Chỉ lấy link từ cột B (index 1)
+                    if len(cells) > 1:
+                        cell_b = cells[1]  # Cột B
+                        cell_a = cells[0] if len(cells) > 0 else None  # Cột A (tên khách sạn)
+                        
+                        # Lấy tên khách sạn từ cột A
+                        hotel_name = cell_a.get_text(strip=True) if cell_a else ''
 
-                        link_tag = cell.find('a', href=True)
-                        if link_tag:
-                            href = link_tag.get('href')
-                            is_valid = is_booking_link(href)
+                        # Lấy link từ cột B (ưu tiên text, không dùng hyperlink)
+                        cell_text = cell_b.get_text(strip=True)
+                        if 'http' in cell_text.lower() or 'www.' in cell_text.lower():
+                            is_valid = is_booking_link(cell_text)
                             links_info.append({
                                 'row': row_idx,
-                                'col': chr(65 + col_idx),
-                                'link': href.strip(),
-                                'cell_value': link_tag.get_text(strip=True),
+                                'col': 'B',
+                                'link': cell_text,
+                                'cell_value': cell_text,
+                                'hotel_name': hotel_name,
                                 'is_valid': is_valid,
                                 'note': '' if is_valid else '⚠️Link không hợp lệ'
                             })
-                        else:
-                            cell_text = cell.get_text(strip=True)
-                            if 'http' in cell_text.lower() or 'www.' in cell_text.lower():
-                                is_valid = is_booking_link(cell_text)
-                                links_info.append({
-                                    'row': row_idx,
-                                    'col': chr(65 + col_idx),
-                                    'link': cell_text,
-                                    'cell_value': cell_text,
-                                    'is_valid': is_valid,
-                                    'note': '' if is_valid else '⚠️Link không hợp lệ'
-                                })
             else:
                 pubhtml_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/pubhtml?gid={gid}"
                 html_response = requests.get(pubhtml_url, timeout=10)
@@ -428,18 +412,24 @@ def load_google_sheet(url):
                     
                     for row_idx, tr in enumerate(soup.find_all('tr'), 1):
                         cells = tr.find_all('td')
-                        for col_idx in range(min(3, len(cells))):
-                            cell = cells[col_idx]
+                        # Chỉ lấy link từ cột B (index 1)
+                        if len(cells) > 1:
+                            cell_b = cells[1]  # Cột B
+                            cell_a = cells[0] if len(cells) > 0 else None  # Cột A (tên khách sạn)
                             
-                            link_tag = cell.find('a', href=True)
-                            if link_tag:
-                                href = link_tag.get('href')
-                                is_valid = is_booking_link(href)
+                            # Lấy tên khách sạn từ cột A
+                            hotel_name = cell_a.get_text(strip=True) if cell_a else ''
+                            
+                            # Lấy link từ cột B (ưu tiên text, không dùng hyperlink)
+                            cell_text = cell_b.get_text(strip=True)
+                            if 'http' in cell_text.lower() or 'www.' in cell_text.lower():
+                                is_valid = is_booking_link(cell_text)
                                 links_info.append({
                                     'row': row_idx,
-                                    'col': chr(65 + col_idx),
-                                    'link': href.strip(),
-                                    'cell_value': link_tag.get_text(strip=True),
+                                    'col': 'B',
+                                    'link': cell_text,
+                                    'cell_value': cell_text,
+                                    'hotel_name': hotel_name,
                                     'is_valid': is_valid,
                                     'note': '' if is_valid else '⚠️Link không hợp lệ'
                                 })
@@ -1239,4 +1229,11 @@ def scrape_booking_data(url, debug_mode=False, row_num=None):
         
     finally:
         if driver:
-            driver.quit()
+            try:
+                driver.quit()
+            except Exception as cleanup_error:
+                # If clean quit fails, try force kill
+                try:
+                    driver.service.process.kill()
+                except:
+                    pass

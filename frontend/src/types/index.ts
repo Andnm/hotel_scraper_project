@@ -31,6 +31,7 @@ export interface LinkInfo {
   col: string
   link: string
   cell_value: string
+  hotel_name?: string
   is_valid: boolean
   market: string
   note?: string
