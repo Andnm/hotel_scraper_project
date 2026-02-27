@@ -104,18 +104,11 @@
               </Tag>
             </template>
           </Column>
-          <Column header="Thao tác" :style="{ width: '150px' }">
+          <Column header="Thao tác" :style="{ width: '80px' }">
             <template #body="slotProps">
-              <div class="action-buttons">
-                <Button icon="pi pi-eye" class="p-button-sm p-button-info" v-tooltip.top="'Xem chi tiết'"
-                  @click="viewDetail(slotProps.data.id)" />
-                <Button icon="pi pi-download" class="p-button-sm p-button-success" v-tooltip.top="'Xuất Excel'"
-                  @click="exportExcel(slotProps.data.id)" />
-                <Button icon="pi pi-link" class="p-button-sm p-button-warning" v-tooltip.top="'Lấy API Link'"
-                  @click="copyApiLink(slotProps.data.id)" />
-                <Button icon="pi pi-trash" class="p-button-sm p-button-danger" v-tooltip.top="'Xóa'"
-                  @click="confirmDelete(slotProps.data.id)" />
-              </div>
+              <Button icon="pi pi-ellipsis-h" class="p-button-sm p-button-text" 
+                @click="toggleMenu($event, slotProps.data.id)" />
+              <Menu :ref="(el) => setMenuRef(el, slotProps.data.id)" :model="getMenuItems(slotProps.data.id)" :popup="true" />
             </template>
           </Column>
         </DataTable>
@@ -278,6 +271,7 @@ import { ref, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import { useHistoryStore } from '@/stores/history'
+import Menu from 'primevue/menu'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -303,6 +297,56 @@ const scrapeTypeOptions = [
 const showDetailDialog = ref(false)
 const showLatestApiDialog = ref(false)
 const selectedHistoryId = ref<number | null>(null)
+
+// Menu management
+const menuRefs = ref<Record<number, any>>({})
+
+function setMenuRef(el: any, historyId: number) {
+  if (el) {
+    menuRefs.value[historyId] = el
+  }
+}
+
+function toggleMenu(event: Event, historyId: number) {
+  const menu = menuRefs.value[historyId]
+  if (menu) {
+    menu.toggle(event)
+  }
+}
+
+function getMenuItems(historyId: number) {
+  return [
+    {
+      label: 'Xem chi tiết',
+      icon: 'pi pi-eye',
+      command: () => viewDetail(historyId)
+    },
+    {
+      label: 'Tải xuống Excel',
+      icon: 'pi pi-download',
+      command: () => exportExcel(historyId)
+    },
+    {
+      label: 'Tạo danh sách Com...',
+      icon: 'pi pi-list',
+      command: () => exportCompetitorsList(historyId)
+    },
+    {
+      label: 'Lấy API Link',
+      icon: 'pi pi-link',
+      command: () => copyApiLink(historyId)
+    },
+    {
+      separator: true
+    },
+    {
+      label: 'Xóa',
+      icon: 'pi pi-trash',
+      command: () => confirmDelete(historyId),
+      class: 'text-red-500'
+    }
+  ]
+}
 
 onMounted(() => {
   loadHistories()
@@ -500,6 +544,89 @@ async function exportExcel(historyId: number) {
       severity: 'error',
       summary: 'Lỗi',
       detail: error.message || 'Không thể xuất Excel',
+      life: 3000
+    })
+  }
+}
+
+async function exportCompetitorsList(historyId: number) {
+  try {
+    toast.add({
+      severity: 'info',
+      summary: 'Đang xử lý',
+      detail: 'Đang tạo danh sách đối thủ...',
+      life: 3000
+    })
+
+    const data = await historyStore.exportHistory(historyId)
+
+    if (!data || data.length === 0) {
+      toast.add({
+        severity: 'warn',
+        summary: 'Thông báo',
+        detail: 'Không có dữ liệu để xuất',
+        life: 3000
+      })
+      return
+    }
+
+    // Define columns for Competitors List
+    const competitorsColumns = [
+      'Tên khách sạn',
+      'Link khách sạn',
+      'Tên hạng phòng',
+      'Số lượng người',
+      'Giường',
+      'Diện tích phòng',
+      'Các lựa chọn',
+      'Các tiện nghi được ưa chuộng nhất',
+      'Market',
+      'Level đối thủ',
+      'Giá bao gồm bữa sáng',
+      'Nhóm hạng phòng',
+      'Level'
+    ];
+
+    // Map data with empty columns for manual fields
+    const competitorsData = data.map((item: any) => {
+      return {
+        'Tên khách sạn': item['Tên khách sạn'] || '',
+        'Link khách sạn': item['Link khách sạn'] || '',
+        'Tên hạng phòng': item['Tên hạng phòng'] || '',
+        'Số lượng người': item['Số lượng người'] || '',
+        'Giường': item['Giường'] || '',
+        'Diện tích phòng': item['Diện tích phòng'] || '',
+        'Các lựa chọn': item['Các lựa chọn'] || '',
+        'Các tiện nghi được ưa chuộng nhất': item['Các tiện nghi được ưa chuộng nhất'] || '',
+        'Market': item['Market'] || '',
+        'Level đối thủ': '',
+        'Giá bao gồm bữa sáng': '',
+        'Nhóm hạng phòng': '',
+        'Level': ''
+      };
+    });
+
+    import('xlsx').then((XLSX) => {
+      const ws = XLSX.utils.json_to_sheet(competitorsData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "Competitors")
+      const filename = `competitors_list_${historyId}_${new Date().toISOString().slice(0, 10)}.xlsx`
+      XLSX.writeFile(wb, filename)
+
+      toast.add({
+        severity: 'success',
+        summary: 'Thành công',
+        detail: 'Đã tạo Competitors List',
+        life: 3000
+      })
+    })
+
+  } catch (error: any) {
+    console.error(error)
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: error.message || 'Không thể tạo Competitors List',
       life: 3000
     })
   }
