@@ -12,6 +12,11 @@
         chooseLabel="Chọn file Excel"
         @select="handleFileSelect"
         style="margin-top: 0.75rem"
+        :pt="{
+          chooseButton: {
+            root: { class: 'p-button-primary' }
+          }
+        }"
       />
 
       <div v-if="selectedFile" class="file-info-card">
@@ -41,6 +46,46 @@
           @click="uploadFile"
           :loading="uploading"
           :disabled="uploading"
+        />
+      </div>
+
+      <div class="divider">
+        <span>HOẶC</span>
+      </div>
+
+      <label class="section-label">🔗 Import từ Google Sheets</label>
+      <div style="margin-top: 0.75rem">
+        <InputText
+          v-model="googleSheetUrl"
+          placeholder="Nhập URL Google Sheet (ví dụ: https://docs.google.com/spreadsheets/d/...)"
+          class="w-full"
+        />
+        
+        <div class="checkbox-wrapper" style="margin-top: 0.75rem">
+          <Checkbox 
+            v-model="saveSheetForReuse"
+            inputId="saveSheetForReuse"
+            binary
+          />
+          <label for="saveSheetForReuse" class="checkbox-label">Lưu nguồn này để sử dụng lại sau</label>
+        </div>
+
+        <div v-if="saveSheetForReuse" style="margin-top: 0.75rem">
+          <InputText
+            v-model="sheetSourceName"
+            placeholder="Đặt tên cho nguồn Google Sheet này"
+            class="w-full"
+          />
+        </div>
+
+        <Button 
+          label="Import từ Google Sheets" 
+          icon="pi pi-link"
+          class="w-full"
+          style="margin-top: 1rem"
+          @click="importFromGoogleSheet"
+          :loading="uploading"
+          :disabled="uploading || !googleSheetUrl"
         />
       </div>
 
@@ -82,6 +127,11 @@ const selectedFile = ref<File | null>(null)
 const saveForReuse = ref(false)
 const sourceName = ref('')
 const uploading = ref(false)
+
+// Google Sheet state
+const googleSheetUrl = ref('')
+const saveSheetForReuse = ref(false)
+const sheetSourceName = ref('')
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -147,6 +197,50 @@ async function uploadFile() {
   }
 }
 
+async function importFromGoogleSheet() {
+  if (!googleSheetUrl.value) return
+
+  uploading.value = true
+  
+  try {
+    const response = await axios.post(`${API_URL}/sources/import-google-sheet`, {
+      url: googleSheetUrl.value,
+      save_for_reuse: saveSheetForReuse.value,
+      name: saveSheetForReuse.value ? sheetSourceName.value : undefined
+    })
+
+    if (response.data.success) {
+      toast.add({
+        severity: 'success',
+        summary: 'Thành công',
+        detail: `Đã import ${response.data.total_links} links từ ${response.data.markets.length} markets`,
+        life: 3000
+      })
+
+      emit('data-loaded', {
+        markets: response.data.markets,
+        links: response.data.links,
+        total_links: response.data.total_links,
+        source_id: response.data.source_id
+      })
+
+      // Reset form
+      googleSheetUrl.value = ''
+      saveSheetForReuse.value = false
+      sheetSourceName.value = ''
+    }
+  } catch (error: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: error.response?.data?.detail || 'Không thể import từ Google Sheet',
+      life: 5000
+    })
+  } finally {
+    uploading.value = false
+  }
+}
+
 async function handleSourceSelected(sourceId: number) {
   uploading.value = true
   
@@ -190,19 +284,22 @@ function formatFileSize(bytes: number): string {
   font-weight: 600;
   color: var(--text-color);
   display: block;
+  margin-bottom: 0.75rem;
 }
 
 .file-info-card {
-  padding: 1rem;
+  padding: 1.25rem;
   background: var(--surface-50);
   border: 2px solid var(--surface-200);
   border-radius: 8px;
+  margin-top: 1rem;
 }
 
 .checkbox-wrapper {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 .checkbox-label {
@@ -243,5 +340,16 @@ function formatFileSize(bytes: number): string {
 
 .loading-section {
   margin-top: 2rem;
+}
+
+/* Override FileUpload button color to blue */
+:deep(.p-fileupload-choose) {
+  background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%) !important;
+  border-color: #1e88e5 !important;
+}
+
+:deep(.p-fileupload-choose:hover) {
+  background: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%) !important;
+  border-color: #1565c0 !important;
 }
 </style>

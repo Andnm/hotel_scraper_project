@@ -225,6 +225,7 @@ class CrawlDataRepository:
                     
                     values.append((
                         history_id,
+                        data.get('Mã số', ''),  # Code from Excel column A
                         data.get('Tên khách sạn', 'N/A'),
                         data.get('Link khách sạn', ''),
                         popular_facilities,
@@ -242,11 +243,11 @@ class CrawlDataRepository:
                 
                 query = """
                     INSERT INTO crawl_data (
-                        history_id, hotel_name, hotel_link, popular_facilities,
+                        history_id, code, hotel_name, hotel_link, popular_facilities,
                         price_after_discount, price_original, discount_percent,
                         review_count, review_score, room_type,
                         num_people, bed_info, room_area, options
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 
                 cursor.executemany(query, values)
@@ -265,27 +266,18 @@ class CrawlDataRepository:
             try:
                 query = """
                     SELECT 
-                        cd.id,
-                        cd.history_id,
-                        cd.hotel_name,
-                        cd.hotel_link,
-                        cd.popular_facilities,
-                        cd.price_after_discount,
-                        cd.price_original,
-                        cd.discount_percent,
-                        cd.review_count,
-                        cd.review_score,
-                        cd.room_type,
-                        cd.num_people,
-                        cd.bed_info,
-                        cd.room_area,
-                        cd.options,
-                        cd.created_at,
+                        cd.*,
                         ch.crawl_date,
                         ch.crawl_target,
-                        ch.market
+                        cl.market AS competitor_market,
+                        cl.cluster AS competitor_cluster,
+                        cl.competitor_level,
+                        cl.breakfast_included,
+                        cl.room_group,
+                        cl.level AS competitor_level_detail
                     FROM crawl_data cd
                     JOIN crawl_history ch ON cd.history_id = ch.id
+                    LEFT JOIN competitor_list cl ON cd.code = cl.code
                     WHERE cd.history_id = %s 
                     ORDER BY cd.id 
                     LIMIT %s OFFSET %s
@@ -322,30 +314,21 @@ class CrawlDataRepository:
             try:
                 query = """
                     SELECT 
-                        cd.id,
-                        cd.history_id,
-                        cd.hotel_name,
-                        cd.hotel_link,
-                        cd.popular_facilities,
-                        cd.price_after_discount,
-                        cd.price_original,
-                        cd.discount_percent,
-                        cd.review_count,
-                        cd.review_score,
-                        cd.room_type,
-                        cd.num_people,
-                        cd.bed_info,
-                        cd.room_area,
-                        cd.options,
-                        cd.created_at,
+                        cd.*,
                         ch.crawl_date,
                         ch.crawl_target,
                         ch.check_in,
                         ch.check_out,
                         ch.scrape_type,
-                        ch.market
+                        cl.market AS competitor_market,
+                        cl.cluster AS competitor_cluster,
+                        cl.competitor_level,
+                        cl.breakfast_included,
+                        cl.room_group,
+                        cl.level AS competitor_level_detail
                     FROM crawl_data cd
                     JOIN crawl_history ch ON cd.history_id = ch.id
+                    LEFT JOIN competitor_list cl ON cd.code = cl.code
                     WHERE cd.history_id = %s
                     ORDER BY cd.id
                 """
@@ -368,25 +351,9 @@ class CrawlDataRepository:
             try:
                 query = """
                     SELECT 
-                        cd.id,
-                        cd.history_id,
-                        cd.hotel_name,
-                        cd.hotel_link,
-                        cd.popular_facilities,
-                        cd.price_after_discount,
-                        cd.price_original,
-                        cd.discount_percent,
-                        cd.review_count,
-                        cd.review_score,
-                        cd.room_type,
-                        cd.num_people,
-                        cd.bed_info,
-                        cd.room_area,
-                        cd.options,
-                        cd.created_at,
+                        cd.*,
                         ch.crawl_date,
-                        ch.crawl_target,
-                        ch.market
+                        ch.crawl_target
                     FROM crawl_data cd
                     JOIN crawl_history ch ON cd.history_id = ch.id
                     ORDER BY ch.created_at, cd.id
@@ -415,25 +382,9 @@ class CrawlDataRepository:
             try:
                 query = """
                     SELECT 
-                        cd.id,
-                        cd.history_id,
-                        cd.hotel_name,
-                        cd.hotel_link,
-                        cd.popular_facilities,
-                        cd.price_after_discount,
-                        cd.price_original,
-                        cd.discount_percent,
-                        cd.review_count,
-                        cd.review_score,
-                        cd.room_type,
-                        cd.num_people,
-                        cd.bed_info,
-                        cd.room_area,
-                        cd.options,
-                        cd.created_at,
+                        cd.*,
                         ch.crawl_date,
-                        ch.crawl_target,
-                        ch.market
+                        ch.crawl_target
                     FROM crawl_data cd
                     JOIN crawl_history ch ON cd.history_id = ch.id
                     WHERE 1=1
@@ -610,5 +561,337 @@ class SavedDataSourceRepository:
             except Exception as e:
                 conn.rollback()
                 raise Exception(f"Error setting active source: {str(e)}")
+            finally:
+                cursor.close()
+
+
+class ConfigRepository:
+    """Repository for config_items table"""
+    
+    def get_all_configs(self) -> List[Dict]:
+        """Get all config items grouped by category"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            try:
+                query = "SELECT * FROM config_items ORDER BY category, config_key"
+                cursor.execute(query)
+                return cursor.fetchall()
+            finally:
+                cursor.close()
+    
+    def get_configs_by_category(self, category: str) -> List[Dict]:
+        """Get config items for a specific category"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            try:
+                query = "SELECT * FROM config_items WHERE category = %s ORDER BY config_key"
+                cursor.execute(query, (category,))
+                return cursor.fetchall()
+            finally:
+                cursor.close()
+    
+    def create_config(self, category: str, config_key: str, config_value: str) -> int:
+        """Create a new config item"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                query = """
+                    INSERT INTO config_items (category, config_key, config_value)
+                    VALUES (%s, %s, %s)
+                """
+                cursor.execute(query, (category, config_key, config_value))
+                conn.commit()
+                return cursor.lastrowid
+            except Exception as e:
+                conn.rollback()
+                raise Exception(f"Error creating config: {str(e)}")
+            finally:
+                cursor.close()
+    
+    def update_config(self, config_id: int, config_key: str, config_value: str) -> bool:
+        """Update an existing config item"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                query = """
+                    UPDATE config_items 
+                    SET config_key = %s, config_value = %s
+                    WHERE id = %s
+                """
+                cursor.execute(query, (config_key, config_value, config_id))
+                conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                conn.rollback()
+                raise Exception(f"Error updating config: {str(e)}")
+            finally:
+                cursor.close()
+    
+    def delete_config(self, config_id: int) -> bool:
+        """Delete a config item"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                query = "DELETE FROM config_items WHERE id = %s"
+                cursor.execute(query, (config_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                conn.rollback()
+                raise Exception(f"Error deleting config: {str(e)}")
+            finally:
+                cursor.close()
+
+
+class CompetitorListRepository:
+    """Repository for competitor_list table"""
+    
+    def get_all_competitors(self, limit: int = 1000, offset: int = 0) -> List[Dict]:
+        """Get all competitors with pagination"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            try:
+                query = """
+                    SELECT * FROM competitor_list 
+                    ORDER BY created_at DESC
+                    LIMIT %s OFFSET %s
+                """
+                cursor.execute(query, (limit, offset))
+                return cursor.fetchall()
+            finally:
+                cursor.close()
+    
+    def get_competitor_by_code(self, code: str) -> Optional[Dict]:
+        """Get competitor by code"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            try:
+                query = "SELECT * FROM competitor_list WHERE code = %s"
+                cursor.execute(query, (code,))
+                return cursor.fetchone()
+            finally:
+                cursor.close()
+    
+    def create_competitor(self, data: Dict) -> int:
+        """Create a new competitor"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                query = """
+                    INSERT INTO competitor_list (
+                        code, hotel_name, hotel_link, room_type, num_people,
+                        bed_info, room_area, room_choices, popular_facilities,
+                        market, cluster, competitor_level, breakfast_included,
+                        room_group, level
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                cursor.execute(query, (
+                    data.get('code'),
+                    data.get('hotel_name'),
+                    data.get('hotel_link'),
+                    data.get('room_type'),
+                    data.get('num_people'),
+                    data.get('bed_info'),
+                    data.get('room_area'),
+                    data.get('room_choices'),
+                    data.get('popular_facilities'),
+                    data.get('market'),
+                    data.get('cluster'),
+                    data.get('competitor_level'),
+                    data.get('breakfast_included'),
+                    data.get('room_group'),
+                    data.get('level')
+                ))
+                conn.commit()
+                return cursor.lastrowid
+            except Exception as e:
+                conn.rollback()
+                raise Exception(f"Error creating competitor: {str(e)}")
+            finally:
+                cursor.close()
+    
+    def update_competitor(self, code: str, data: Dict) -> bool:
+        """Update an existing competitor"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                query = """
+                    UPDATE competitor_list SET
+                        hotel_name = %s, hotel_link = %s, room_type = %s, num_people = %s,
+                        bed_info = %s, room_area = %s, room_choices = %s, popular_facilities = %s,
+                        market = %s, cluster = %s, competitor_level = %s, breakfast_included = %s,
+                        room_group = %s, level = %s
+                    WHERE code = %s
+                """
+                cursor.execute(query, (
+                    data.get('hotel_name'),
+                    data.get('hotel_link'),
+                    data.get('room_type'),
+                    data.get('num_people'),
+                    data.get('bed_info'),
+                    data.get('room_area'),
+                    data.get('room_choices'),
+                    data.get('popular_facilities'),
+                    data.get('market'),
+                    data.get('cluster'),
+                    data.get('competitor_level'),
+                    data.get('breakfast_included'),
+                    data.get('room_group'),
+                    data.get('level'),
+                    code
+                ))
+                conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                conn.rollback()
+                raise Exception(f"Error updating competitor: {str(e)}")
+            finally:
+                cursor.close()
+    
+    def upsert_competitor(self, data: Dict) -> int:
+        """Insert or update competitor based on code"""
+        existing = self.get_competitor_by_code(data.get('code'))
+        if existing:
+            self.update_competitor(data.get('code'), data)
+            return existing['id']
+        else:
+            return self.create_competitor(data)
+    
+    def delete_competitor(self, code: str) -> bool:
+        """Delete a competitor"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                query = "DELETE FROM competitor_list WHERE code = %s"
+                cursor.execute(query, (code,))
+                conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                conn.rollback()
+                raise Exception(f"Error deleting competitor: {str(e)}")
+            finally:
+                cursor.close()
+    
+    def get_total_count(self) -> int:
+        """Get total number of competitors"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                query = "SELECT COUNT(*) FROM competitor_list"
+                cursor.execute(query)
+                result = cursor.fetchone()
+                return result[0] if result else 0
+            finally:
+                cursor.close()
+
+
+class MarketClusterRepository:
+    """Repository for market_cluster_mapping table"""
+    
+    def get_all_mappings(self, limit: int = 1000, offset: int = 0) -> List[Dict]:
+        """Get all market-cluster mappings with pagination"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            try:
+                query = """
+                    SELECT * FROM market_cluster_mapping 
+                    ORDER BY code 
+                    LIMIT %s OFFSET %s
+                """
+                cursor.execute(query, (limit, offset))
+                return cursor.fetchall()
+            finally:
+                cursor.close()
+    
+    def get_mapping_by_code(self, code: str) -> Optional[Dict]:
+        """Get mapping by code"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            try:
+                query = "SELECT * FROM market_cluster_mapping WHERE code = %s"
+                cursor.execute(query, (code,))
+                return cursor.fetchone()
+            finally:
+                cursor.close()
+    
+    def create_mapping(self, data: Dict) -> int:
+        """Create a new market-cluster mapping"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                query = """
+                    INSERT INTO market_cluster_mapping 
+                    (code, market, cluster)
+                    VALUES (%s, %s, %s)
+                """
+                cursor.execute(query, (
+                    data.get('code'),
+                    data.get('market'),
+                    data.get('cluster')
+                ))
+                conn.commit()
+                return cursor.lastrowid
+            except Exception as e:
+                conn.rollback()
+                raise Exception(f"Error creating mapping: {str(e)}")
+            finally:
+                cursor.close()
+    
+    def update_mapping(self, code: str, data: Dict) -> bool:
+        """Update an existing mapping"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                query = """
+                    UPDATE market_cluster_mapping 
+                    SET market = %s, cluster = %s
+                    WHERE code = %s
+                """
+                cursor.execute(query, (
+                    data.get('market'),
+                    data.get('cluster'),
+                    code
+                ))
+                conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                conn.rollback()
+                raise Exception(f"Error updating mapping: {str(e)}")
+            finally:
+                cursor.close()
+    
+    def upsert_mapping(self, data: Dict) -> int:
+        """Insert or update mapping based on code"""
+        existing = self.get_mapping_by_code(data.get('code'))
+        if existing:
+            self.update_mapping(data.get('code'), data)
+            return existing['id']
+        else:
+            return self.create_mapping(data)
+    
+    def delete_mapping(self, code: str) -> bool:
+        """Delete a mapping"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                query = "DELETE FROM market_cluster_mapping WHERE code = %s"
+                cursor.execute(query, (code,))
+                conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                conn.rollback()
+                raise Exception(f"Error deleting mapping: {str(e)}")
+            finally:
+                cursor.close()
+    
+    def get_total_count(self) -> int:
+        """Get total number of mappings"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                query = "SELECT COUNT(*) FROM market_cluster_mapping"
+                cursor.execute(query)
+                result = cursor.fetchone()
+                return result[0] if result else 0
             finally:
                 cursor.close()

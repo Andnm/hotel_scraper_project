@@ -45,13 +45,12 @@
             </div>
           </div>
           
-          <div style="display: flex; gap: 0.25rem; flex-shrink: 0">
+          <div style="display: flex; gap: 0.5rem; flex-shrink: 0">
             <Button 
               icon="pi pi-check" 
               size="small"
-              text
-              rounded
-              severity="success"
+              outlined
+              severity="primary"
               v-tooltip.top="'Sử dụng nguồn này'"
               @click="useSource(source)"
               
@@ -59,8 +58,7 @@
             <Button 
               icon="pi pi-trash" 
               size="small"
-              text
-              rounded
+              outlined
               severity="danger"
               v-tooltip.top="'Xóa'"
               @click="confirmDelete(source)"

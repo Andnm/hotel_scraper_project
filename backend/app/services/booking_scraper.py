@@ -259,6 +259,7 @@ def get_markets_from_excel(file_bytes):
 def extract_hyperlinks_from_excel(file_bytes, market=None):
     """
     Trích xuất links từ Excel file.
+    Format: Cột A = Mã số, Cột B = Tên khách sạn, Cột C = Link
     Nếu market=None: lấy tất cả sheets với thông tin market
     Nếu market được chỉ định: chỉ lấy từ sheet đó
     """
@@ -275,25 +276,28 @@ def extract_hyperlinks_from_excel(file_bytes, market=None):
             sheets_to_process = [(sheet_name, wb[sheet_name]) for sheet_name in wb.sheetnames]
         
         for sheet_name, ws in sheets_to_process:
-            # Chỉ lấy link từ cột B (col_idx = 2)
-            for row_idx in range(1, ws.max_row + 1):
-                cell_b = ws.cell(row=row_idx, column=2)  # Cột B
-                cell_a = ws.cell(row=row_idx, column=1)  # Cột A (tên khách sạn)
+            # Format mới: A = Mã số, B = Tên KS, C = Link
+            for row_idx in range(2, ws.max_row + 1):  # Bỏ qua header row
+                cell_a = ws.cell(row=row_idx, column=1)  # Cột A - Mã số
+                cell_b = ws.cell(row=row_idx, column=2)  # Cột B - Tên khách sạn
+                cell_c = ws.cell(row=row_idx, column=3)  # Cột C - Link
 
-                # Lấy giá trị text trực tiếp từ cột B
-                if cell_b.value:
-                    cell_text = str(cell_b.value).strip()
+                # Lấy giá trị text trực tiếp từ cột C (Link)
+                if cell_c.value:
+                    cell_text = str(cell_c.value).strip()
                     if 'http' in cell_text.lower() or 'www.' in cell_text.lower():
                         is_valid = is_booking_link(cell_text)
                         
-                        # Lấy tên khách sạn từ cột A
-                        hotel_name = str(cell_a.value).strip() if cell_a.value else ''
+                        # Lấy mã số từ cột A và tên khách sạn từ cột B
+                        code = str(cell_a.value).strip() if cell_a.value else ''
+                        hotel_name = str(cell_b.value).strip() if cell_b.value else ''
                         
                         links_info.append({
                             'row': row_idx,
-                            'col': 'B',
+                            'col': 'C',
                             'link': cell_text,
                             'cell_value': cell_text,
+                            'code': code,
                             'hotel_name': hotel_name,
                             'is_valid': is_valid,
                             'market': sheet_name,

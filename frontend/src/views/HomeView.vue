@@ -5,14 +5,7 @@
         <i class="pi pi-download"></i> Cào dữ liệu khách sạn
       </template>
       <template #content>
-        <TabView>
-          <TabPanel header="Booking.com">
-            <BookingTab />
-          </TabPanel>
-          <TabPanel header="Agoda.com" :disabled="true">
-            <p class="text-muted">Tính năng đang phát triển...</p>
-          </TabPanel>
-        </TabView>
+        <BookingTab />
       </template>
     </Card>
   </div>

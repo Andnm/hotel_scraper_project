@@ -2,10 +2,10 @@
   <div class="history-list">
     <Card class="filter-card mb-4">
       <template #title>
-        <div class="flex justify-content-between align-items-center">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 2rem;">
           <span>Công cụ lọc</span>
-          <Button label="Lấy API dữ liệu mới nhất" icon="pi pi-bolt" class="p-button-outlined"
-            @click="showLatestApiDialog = true" />
+          <Button label="Lấy API dữ liệu mới nhất" icon="pi pi-bolt" outlined
+            @click="showLatestApiDialog = true" severity="primary" />
         </div>
       </template>
       <template #content>
@@ -40,7 +40,7 @@
 
           <div class="filter-item">
             <label style="visibility: hidden">Thao tác</label>
-            <Button label="🔍 Tìm kiếm" @click="loadHistories" :loading="historyStore.loading" class="w-full" />
+            <Button label="🔍 Tìm kiếm" @click="loadHistories" :loading="historyStore.loading" class="w-full" severity="primary" />
           </div>
         </div>
       </template>
@@ -136,11 +136,11 @@
 
         <div class="grid formgrid p-fluid">
           <div class="col-6">
-            <Button label="API Cào Giá" style="margin-top: 5px" class="p-button-warning"
+            <Button label="API Cào Giá" style="margin-top: 5px" severity="primary"
               @click="copyLatestApiLink('price')" />
           </div>
           <div class="col-6">
-            <Button label="API Cào Thông tin" style="margin-top: 5px" class="p-button-info"
+            <Button label="API Cào Thông tin" style="margin-top: 5px" severity="primary"
               @click="copyLatestApiLink('info')" />
           </div>
         </div>
@@ -210,14 +210,24 @@
                 </div>
               </template>
             </Column>
-            <Column field="Market" header="Market" :style="{ width: '100px' }">
+            <Column field="Market" header="Market" :style="{ width: '100px' }"></Column>
+            <Column field="Cluster" header="Cluster" :style="{ width: '120px' }"></Column>
+            <Column field="Level_doi_thu" header="Level ĐT" :style="{ width: '100px' }">
               <template #body="slotProps">
-                <Tag v-if="slotProps.data.market" severity="secondary">
-                  {{ slotProps.data.market }}
-                </Tag>
-                <span v-else style="color: #999">-</span>
+                {{ slotProps.data['Level đối thủ'] }}
               </template>
             </Column>
+            <Column field="Gia_bao_gom_bua_sang" header="Bữa sáng" :style="{ width: '100px' }">
+              <template #body="slotProps">
+                {{ slotProps.data['Giá bao gồm bữa sáng'] }}
+              </template>
+            </Column>
+            <Column field="Nhom_hang_phong" header="Nhóm HP" :style="{ width: '100px' }">
+              <template #body="slotProps">
+                {{ slotProps.data['Nhóm hạng phòng'] }}
+              </template>
+            </Column>
+            <Column field="Level" header="Level" :style="{ width: '100px' }"></Column>
           </template>
 
           <!-- Price Mode Columns -->
@@ -242,19 +252,29 @@
                 </Tag>
               </template>
             </Column>
+            <Column field="Market" header="Market" :style="{ width: '100px' }"></Column>
+            <Column field="Cluster" header="Cluster" :style="{ width: '120px' }"></Column>
+            <Column field="Level_doi_thu" header="Level ĐT" :style="{ width: '100px' }">
+              <template #body="slotProps">
+                {{ slotProps.data['Level đối thủ'] }}
+              </template>
+            </Column>
+            <Column field="Gia_bao_gom_bua_sang" header="Bữa sáng" :style="{ width: '100px' }">
+              <template #body="slotProps">
+                {{ slotProps.data['Giá bao gồm bữa sáng'] }}
+              </template>
+            </Column>
+            <Column field="Nhom_hang_phong" header="Nhóm HP" :style="{ width: '100px' }">
+              <template #body="slotProps">
+                {{ slotProps.data['Nhóm hạng phòng'] }}
+              </template>
+            </Column>
+            <Column field="Level" header="Level" :style="{ width: '100px' }"></Column>
             <Column field="hotel_link" header="Link" :style="{ width: '80px' }">
               <template #body="slotProps">
                 <a :href="slotProps.data.hotel_link" target="_blank" v-if="slotProps.data.hotel_link">
                   <Button icon="pi pi-external-link" text size="small" />
                 </a>
-              </template>
-            </Column>
-            <Column field="Market" header="Market" :style="{ width: '100px' }">
-              <template #body="slotProps">
-                <Tag v-if="slotProps.data.market" severity="secondary">
-                  {{ slotProps.data.market }}
-                </Tag>
-                <span v-else style="color: #999">-</span>
               </template>
             </Column>
           </template>
@@ -580,7 +600,6 @@ async function exportCompetitorsList(historyId: number) {
       'Diện tích phòng',
       'Các lựa chọn',
       'Các tiện nghi được ưa chuộng nhất',
-      'Market',
       'Level đối thủ',
       'Giá bao gồm bữa sáng',
       'Nhóm hạng phòng',
@@ -598,7 +617,6 @@ async function exportCompetitorsList(historyId: number) {
         'Diện tích phòng': item['Diện tích phòng'] || '',
         'Các lựa chọn': item['Các lựa chọn'] || '',
         'Các tiện nghi được ưa chuộng nhất': item['Các tiện nghi được ưa chuộng nhất'] || '',
-        'Market': item['Market'] || '',
         'Level đối thủ': '',
         'Giá bao gồm bữa sáng': '',
         'Nhóm hạng phòng': '',

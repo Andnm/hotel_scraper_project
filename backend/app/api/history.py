@@ -127,7 +127,6 @@ async def export_history_data(history_id: int):
                 'Giá sau giảm': record.get('price_after_discount') if record.get('price_after_discount') else '',
                 'Giá gốc': record.get('price_original') if record.get('price_original') else '',
                 'Giảm giá': record.get('discount_percent') or '',
-                'Market': record.get('market') or '',
                 'scrape_type': record.get('scrape_type', 'info') # Add scrape_type for frontend checking
             })
         
@@ -182,7 +181,12 @@ async def get_history_public_data(history_id: int):
                     'Giường': record.get('bed_info') or '',
                     'Diện tích phòng': record.get('room_area') or '',
                     'Các lựa chọn': options.get('facilities', ''),
-                    'Market': record.get('market') or ''
+                    'Market': record.get('competitor_market') or '',
+                    'Cluster': record.get('competitor_cluster') or '',
+                    'Level đối thủ': record.get('competitor_level') or '',
+                    'Giá bao gồm bữa sáng': record.get('breakfast_included') or '',
+                    'Nhóm hạng phòng': record.get('room_group') or '',
+                    'Level': record.get('competitor_level_detail') or ''
                 })
             else:
                 # Price-specific columns
@@ -193,7 +197,12 @@ async def get_history_public_data(history_id: int):
                     'Giá sau giảm': record.get('price_after_discount') if record.get('price_after_discount') else '',
                     'Giá gốc': record.get('price_original') if record.get('price_original') else '',
                     'Giảm giá': record.get('discount_percent') or '',
-                    'Market': record.get('market') or ''
+                    'Market': record.get('competitor_market') or '',
+                    'Cluster': record.get('competitor_cluster') or '',
+                    'Level đối thủ': record.get('competitor_level') or '',
+                    'Giá bao gồm bữa sáng': record.get('breakfast_included') or '',
+                    'Nhóm hạng phòng': record.get('room_group') or '',
+                    'Level': record.get('competitor_level_detail') or ''
                 })
         
         return formatted_records

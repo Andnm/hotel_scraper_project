@@ -1,7 +1,8 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from typing import List, Optional
+from pydantic import BaseModel
 from app.database.repositories import SavedDataSourceRepository
-from app.services.booking_scraper import extract_hyperlinks_from_excel, get_markets_from_excel
+from app.services.booking_scraper import extract_hyperlinks_from_excel, get_markets_from_excel, load_google_sheet
 import os
 from datetime import datetime
 
@@ -9,6 +10,12 @@ router = APIRouter()
 
 UPLOAD_DIR = "uploaded_files"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+class GoogleSheetImportRequest(BaseModel):
+    url: str
+    save_for_reuse: bool = False
+    name: Optional[str] = None
+    market: Optional[str] = "Default"
 
 @router.post("/sources/upload")
 async def upload_source(
@@ -161,6 +168,59 @@ async def get_links_by_market(source_id: int, market: str):
             }
         else:
             raise HTTPException(status_code=400, detail="File không tồn tại")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+
+
+@router.post("/sources/import-google-sheet")
+async def import_google_sheet(request: GoogleSheetImportRequest):
+    """Import links từ Google Sheet"""
+    try:
+        # Load data từ Google Sheet
+        df, links_info, error = load_google_sheet(request.url)
+        
+        if error:
+            raise HTTPException(status_code=400, detail=error)
+        
+        if not links_info:
+            raise HTTPException(status_code=400, detail="Không tìm thấy link nào trong Google Sheet")
+        
+        # Format links theo cấu trúc mong muốn
+        market = request.market or "Default"
+        formatted_links = []
+        
+        for link_data in links_info:
+            formatted_links.append({
+                "market": market,
+                "hotel_name": link_data.get("hotel_name", ""),
+                "cell_value": link_data.get("cell_value", ""),
+                "link": link_data["link"],
+                "is_valid": link_data["is_valid"],
+                "code": None
+            })
+        
+        source_id = None
+        
+        # Nếu user muốn lưu lại để dùng sau
+        if request.save_for_reuse:
+            repo = SavedDataSourceRepository()
+            source_name = request.name or f"Google Sheet - {market}"
+            source_id = repo.create_source(
+                name=source_name,
+                source_type='google_sheets',
+                sheets_url=request.url
+            )
+        
+        return {
+            "success": True,
+            "markets": [market],
+            "links": formatted_links,
+            "total_links": len(formatted_links),
+            "source_id": source_id
+        }
     
     except HTTPException:
         raise

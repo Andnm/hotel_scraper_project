@@ -40,7 +40,7 @@
 
 <script setup lang="ts">
 const props = defineProps<{
-  modelValue: 'info' | 'price'
+  modelValue: 'info' | 'price' | null
 }>()
 
 const emit = defineEmits<{
@@ -77,9 +77,9 @@ function selectMode(mode: 'info' | 'price') {
 }
 
 .mode-selected {
-  border-color: var(--green-500);
-  background: var(--green-50);
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+  border-color: var(--primary-color);
+  background: var(--primary-50);
+  box-shadow: 0 0 0 3px rgba(30, 136, 229, 0.15);
 }
 
 .mode-description {

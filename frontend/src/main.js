@@ -42,7 +42,17 @@ app.use(PrimeVue, {
   theme: {
     preset: Aura,
     options: {
-      darkModeSelector: false
+      darkModeSelector: false,
+      cssLayer: false
+    }
+  },
+  pt: {
+    button: {
+      root: ({ props }) => ({
+        class: [
+          props.severity === 'primary' || (!props.severity && !props.text && !props.outlined) ? 'custom-primary-button' : ''
+        ]
+      })
     }
   }
 })

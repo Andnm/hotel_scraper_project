@@ -190,6 +190,7 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                                     # Common fields
                                     common_data = {
                                         'Hàng_gốc': row_num,
+                                        'Mã số': link_info.get('code', ''),
                                         'Ngày cào': datetime.now().strftime('%Y-%m-%d'),
                                         'Giờ cào': datetime.now().strftime('%H:%M:%S'),
                                         'Check in': checkin_date,

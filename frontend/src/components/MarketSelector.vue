@@ -84,12 +84,12 @@ function getMarketLabel(value: string): string {
 }
 
 function handleChange() {
-  emit('update:modelValue', selectedMarket.value === 'all' ? null : selectedMarket.value)
+  emit('update:modelValue', selectedMarket.value)
 }
 
 watch(() => props.modelValue, (newVal) => {
   selectedMarket.value = newVal || 'all'
-})
+}, { immediate: true })
 </script>
 
 <style scoped>
