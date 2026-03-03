@@ -277,7 +277,12 @@ class CrawlDataRepository:
                         cl.level AS competitor_level_detail
                     FROM crawl_data cd
                     JOIN crawl_history ch ON cd.history_id = ch.id
-                    LEFT JOIN competitor_list cl ON cd.code = cl.code
+                    LEFT JOIN competitor_list cl ON 
+                        cd.hotel_name = cl.hotel_name 
+                        AND cd.room_type = cl.room_type
+                        AND (cl.num_people IS NULL OR cd.num_people = cl.num_people)
+                        AND (cl.bed_info IS NULL OR cl.bed_info = '' OR cd.bed_info = cl.bed_info)
+                        AND (cl.room_area IS NULL OR cl.room_area = '' OR cd.room_area = cl.room_area)
                     WHERE cd.history_id = %s 
                     ORDER BY cd.id 
                     LIMIT %s OFFSET %s
@@ -328,7 +333,12 @@ class CrawlDataRepository:
                         cl.level AS competitor_level_detail
                     FROM crawl_data cd
                     JOIN crawl_history ch ON cd.history_id = ch.id
-                    LEFT JOIN competitor_list cl ON cd.code = cl.code
+                    LEFT JOIN competitor_list cl ON 
+                        cd.hotel_name = cl.hotel_name 
+                        AND cd.room_type = cl.room_type
+                        AND (cl.num_people IS NULL OR cd.num_people = cl.num_people)
+                        AND (cl.bed_info IS NULL OR cl.bed_info = '' OR cd.bed_info = cl.bed_info)
+                        AND (cl.room_area IS NULL OR cl.room_area = '' OR cd.room_area = cl.room_area)
                     WHERE cd.history_id = %s
                     ORDER BY cd.id
                 """
@@ -644,7 +654,7 @@ class ConfigRepository:
 
 
 class CompetitorListRepository:
-    """Repository for competitor_list table"""
+    """Repository for competitor_list table (matching based on hotel_name + room details)"""
     
     def get_all_competitors(self, limit: int = 1000, offset: int = 0) -> List[Dict]:
         """Get all competitors with pagination"""
@@ -661,13 +671,46 @@ class CompetitorListRepository:
             finally:
                 cursor.close()
     
-    def get_competitor_by_code(self, code: str) -> Optional[Dict]:
-        """Get competitor by code"""
+    def find_competitor(self, hotel_name: str, room_type: str, num_people: int = None, 
+                       bed_info: str = None, room_area: str = None) -> Optional[Dict]:
+        """
+        Find competitor by matching hotel_name + room details.
+        hotel_name and room_type are REQUIRED.
+        Other fields are optional - only match if they have values.
+        """
         with get_db_connection() as conn:
             cursor = conn.cursor(dictionary=True)
             try:
-                query = "SELECT * FROM competitor_list WHERE code = %s"
-                cursor.execute(query, (code,))
+                # Build dynamic query based on available fields
+                conditions = ["hotel_name = %s", "room_type = %s"]
+                params = [hotel_name, room_type]
+                
+                # Add optional fields if they have values
+                if num_people is not None:
+                    conditions.append("num_people = %s")
+                    params.append(num_people)
+                
+                if bed_info:
+                    conditions.append("bed_info = %s")
+                    params.append(bed_info)
+                
+                if room_area:
+                    conditions.append("room_area = %s")
+                    params.append(room_area)
+                
+                query = f"SELECT * FROM competitor_list WHERE {' AND '.join(conditions)} LIMIT 1"
+                cursor.execute(query, tuple(params))
+                return cursor.fetchone()
+            finally:
+                cursor.close()
+    
+    def get_competitor_by_id(self, competitor_id: int) -> Optional[Dict]:
+        """Get competitor by ID"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            try:
+                query = "SELECT * FROM competitor_list WHERE id = %s"
+                cursor.execute(query, (competitor_id,))
                 return cursor.fetchone()
             finally:
                 cursor.close()
@@ -679,14 +722,13 @@ class CompetitorListRepository:
             try:
                 query = """
                     INSERT INTO competitor_list (
-                        code, hotel_name, hotel_link, room_type, num_people,
+                        hotel_name, hotel_link, room_type, num_people,
                         bed_info, room_area, room_choices, popular_facilities,
                         market, cluster, competitor_level, breakfast_included,
                         room_group, level
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 cursor.execute(query, (
-                    data.get('code'),
                     data.get('hotel_name'),
                     data.get('hotel_link'),
                     data.get('room_type'),
@@ -710,8 +752,8 @@ class CompetitorListRepository:
             finally:
                 cursor.close()
     
-    def update_competitor(self, code: str, data: Dict) -> bool:
-        """Update an existing competitor"""
+    def update_competitor(self, competitor_id: int, data: Dict) -> bool:
+        """Update an existing competitor by ID"""
         with get_db_connection() as conn:
             cursor = conn.cursor()
             try:
@@ -721,7 +763,7 @@ class CompetitorListRepository:
                         bed_info = %s, room_area = %s, room_choices = %s, popular_facilities = %s,
                         market = %s, cluster = %s, competitor_level = %s, breakfast_included = %s,
                         room_group = %s, level = %s
-                    WHERE code = %s
+                    WHERE id = %s
                 """
                 cursor.execute(query, (
                     data.get('hotel_name'),
@@ -738,7 +780,7 @@ class CompetitorListRepository:
                     data.get('breakfast_included'),
                     data.get('room_group'),
                     data.get('level'),
-                    code
+                    competitor_id
                 ))
                 conn.commit()
                 return cursor.rowcount > 0
@@ -749,21 +791,30 @@ class CompetitorListRepository:
                 cursor.close()
     
     def upsert_competitor(self, data: Dict) -> int:
-        """Insert or update competitor based on code"""
-        existing = self.get_competitor_by_code(data.get('code'))
+        """
+        Insert or update competitor based on hotel_name + room details matching.
+        Matches on hotel_name + room_type (required) + optional fields.
+        """
+        existing = self.find_competitor(
+            hotel_name=data.get('hotel_name'),
+            room_type=data.get('room_type'),
+            num_people=data.get('num_people'),
+            bed_info=data.get('bed_info'),
+            room_area=data.get('room_area')
+        )
         if existing:
-            self.update_competitor(data.get('code'), data)
+            self.update_competitor(existing['id'], data)
             return existing['id']
         else:
             return self.create_competitor(data)
     
-    def delete_competitor(self, code: str) -> bool:
-        """Delete a competitor"""
+    def delete_competitor(self, competitor_id: int) -> bool:
+        """Delete a competitor by ID"""
         with get_db_connection() as conn:
             cursor = conn.cursor()
             try:
-                query = "DELETE FROM competitor_list WHERE code = %s"
-                cursor.execute(query, (code,))
+                query = "DELETE FROM competitor_list WHERE id = %s"
+                cursor.execute(query, (competitor_id,))
                 conn.commit()
                 return cursor.rowcount > 0
             except Exception as e:
@@ -778,118 +829,6 @@ class CompetitorListRepository:
             cursor = conn.cursor()
             try:
                 query = "SELECT COUNT(*) FROM competitor_list"
-                cursor.execute(query)
-                result = cursor.fetchone()
-                return result[0] if result else 0
-            finally:
-                cursor.close()
-
-
-class MarketClusterRepository:
-    """Repository for market_cluster_mapping table"""
-    
-    def get_all_mappings(self, limit: int = 1000, offset: int = 0) -> List[Dict]:
-        """Get all market-cluster mappings with pagination"""
-        with get_db_connection() as conn:
-            cursor = conn.cursor(dictionary=True)
-            try:
-                query = """
-                    SELECT * FROM market_cluster_mapping 
-                    ORDER BY code 
-                    LIMIT %s OFFSET %s
-                """
-                cursor.execute(query, (limit, offset))
-                return cursor.fetchall()
-            finally:
-                cursor.close()
-    
-    def get_mapping_by_code(self, code: str) -> Optional[Dict]:
-        """Get mapping by code"""
-        with get_db_connection() as conn:
-            cursor = conn.cursor(dictionary=True)
-            try:
-                query = "SELECT * FROM market_cluster_mapping WHERE code = %s"
-                cursor.execute(query, (code,))
-                return cursor.fetchone()
-            finally:
-                cursor.close()
-    
-    def create_mapping(self, data: Dict) -> int:
-        """Create a new market-cluster mapping"""
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            try:
-                query = """
-                    INSERT INTO market_cluster_mapping 
-                    (code, market, cluster)
-                    VALUES (%s, %s, %s)
-                """
-                cursor.execute(query, (
-                    data.get('code'),
-                    data.get('market'),
-                    data.get('cluster')
-                ))
-                conn.commit()
-                return cursor.lastrowid
-            except Exception as e:
-                conn.rollback()
-                raise Exception(f"Error creating mapping: {str(e)}")
-            finally:
-                cursor.close()
-    
-    def update_mapping(self, code: str, data: Dict) -> bool:
-        """Update an existing mapping"""
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            try:
-                query = """
-                    UPDATE market_cluster_mapping 
-                    SET market = %s, cluster = %s
-                    WHERE code = %s
-                """
-                cursor.execute(query, (
-                    data.get('market'),
-                    data.get('cluster'),
-                    code
-                ))
-                conn.commit()
-                return cursor.rowcount > 0
-            except Exception as e:
-                conn.rollback()
-                raise Exception(f"Error updating mapping: {str(e)}")
-            finally:
-                cursor.close()
-    
-    def upsert_mapping(self, data: Dict) -> int:
-        """Insert or update mapping based on code"""
-        existing = self.get_mapping_by_code(data.get('code'))
-        if existing:
-            self.update_mapping(data.get('code'), data)
-            return existing['id']
-        else:
-            return self.create_mapping(data)
-    
-    def delete_mapping(self, code: str) -> bool:
-        """Delete a mapping"""
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            try:
-                query = "DELETE FROM market_cluster_mapping WHERE code = %s"
-                cursor.execute(query, (code,))
-                conn.commit()
-                return cursor.rowcount > 0
-            except Exception as e:
-                conn.rollback()
-                raise Exception(f"Error deleting mapping: {str(e)}")
-            finally:
-                cursor.close()
-    
-    def get_total_count(self) -> int:
-        """Get total number of mappings"""
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            try:
-                query = "SELECT COUNT(*) FROM market_cluster_mapping"
                 cursor.execute(query)
                 result = cursor.fetchone()
                 return result[0] if result else 0

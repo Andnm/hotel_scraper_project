@@ -259,7 +259,7 @@ def get_markets_from_excel(file_bytes):
 def extract_hyperlinks_from_excel(file_bytes, market=None):
     """
     Trích xuất links từ Excel file.
-    Format: Cột A = Mã số, Cột B = Tên khách sạn, Cột C = Link
+    Format: Cột A = Tên khách sạn, Cột B = Link
     Nếu market=None: lấy tất cả sheets với thông tin market
     Nếu market được chỉ định: chỉ lấy từ sheet đó
     """
@@ -276,28 +276,25 @@ def extract_hyperlinks_from_excel(file_bytes, market=None):
             sheets_to_process = [(sheet_name, wb[sheet_name]) for sheet_name in wb.sheetnames]
         
         for sheet_name, ws in sheets_to_process:
-            # Format mới: A = Mã số, B = Tên KS, C = Link
+            # Format: A = Tên KS, B = Link
             for row_idx in range(2, ws.max_row + 1):  # Bỏ qua header row
-                cell_a = ws.cell(row=row_idx, column=1)  # Cột A - Mã số
-                cell_b = ws.cell(row=row_idx, column=2)  # Cột B - Tên khách sạn
-                cell_c = ws.cell(row=row_idx, column=3)  # Cột C - Link
+                cell_a = ws.cell(row=row_idx, column=1)  # Cột A - Tên khách sạn
+                cell_b = ws.cell(row=row_idx, column=2)  # Cột B - Link
 
-                # Lấy giá trị text trực tiếp từ cột C (Link)
-                if cell_c.value:
-                    cell_text = str(cell_c.value).strip()
+                # Lấy giá trị text trực tiếp từ cột B (Link)
+                if cell_b.value:
+                    cell_text = str(cell_b.value).strip()
                     if 'http' in cell_text.lower() or 'www.' in cell_text.lower():
                         is_valid = is_booking_link(cell_text)
                         
-                        # Lấy mã số từ cột A và tên khách sạn từ cột B
-                        code = str(cell_a.value).strip() if cell_a.value else ''
-                        hotel_name = str(cell_b.value).strip() if cell_b.value else ''
+                        # Lấy tên khách sạn từ cột A
+                        hotel_name = str(cell_a.value).strip() if cell_a.value else ''
                         
                         links_info.append({
                             'row': row_idx,
-                            'col': 'C',
+                            'col': 'B',
                             'link': cell_text,
                             'cell_value': cell_text,
-                            'code': code,
                             'hotel_name': hotel_name,
                             'is_valid': is_valid,
                             'market': sheet_name,
@@ -360,6 +357,10 @@ def force_vnd_currency(url):
 
 
 def load_google_sheet(url):
+    """
+    Tải dữ liệu từ Google Sheet.
+    Format: Cột A = Tên khách sạn, Cột B = Link
+    """
     try:
         match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', url)
         if not match:
@@ -386,10 +387,10 @@ def load_google_sheet(url):
 
                 for row_idx, tr in enumerate(soup.find_all('tr'), 1):
                     cells = tr.find_all('td')
-                    # Chỉ lấy link từ cột B (index 1)
+                    # Format: A = Tên KS, B = Link
                     if len(cells) > 1:
-                        cell_b = cells[1]  # Cột B
-                        cell_a = cells[0] if len(cells) > 0 else None  # Cột A (tên khách sạn)
+                        cell_a = cells[0]  # Cột A - Tên khách sạn
+                        cell_b = cells[1]  # Cột B - Link
                         
                         # Lấy tên khách sạn từ cột A
                         hotel_name = cell_a.get_text(strip=True) if cell_a else ''
@@ -416,10 +417,10 @@ def load_google_sheet(url):
                     
                     for row_idx, tr in enumerate(soup.find_all('tr'), 1):
                         cells = tr.find_all('td')
-                        # Chỉ lấy link từ cột B (index 1)
+                        # Format: A = Tên KS, B = Link
                         if len(cells) > 1:
-                            cell_b = cells[1]  # Cột B
-                            cell_a = cells[0] if len(cells) > 0 else None  # Cột A (tên khách sạn)
+                            cell_a = cells[0]  # Cột A - Tên khách sạn
+                            cell_b = cells[1]  # Cột B - Link
                             
                             # Lấy tên khách sạn từ cột A
                             hotel_name = cell_a.get_text(strip=True) if cell_a else ''
@@ -437,38 +438,29 @@ def load_google_sheet(url):
                                     'is_valid': is_valid,
                                     'note': '' if is_valid else '⚠️Link không hợp lệ'
                                 })
-                            else:
-                                cell_text = cell.get_text(strip=True)
-                                if 'http' in cell_text.lower() or 'www.' in cell_text.lower():
-                                    is_valid = is_booking_link(cell_text)
-                                    links_info.append({
-                                        'row': row_idx,
-                                        'col': chr(65 + col_idx),
-                                        'link': cell_text,
-                                        'cell_value': cell_text,
-                                        'is_valid': is_valid,
-                                        'note': '' if is_valid else '⚠️Link không hợp lệ'
-                                    })
         except Exception as e:
             print(f"HTML extraction error: {e}")
 
         if not links_info:
-            for col_idx in [0, 1, 2]:
-                if col_idx < len(df.columns):
-                    col_name = df.columns[col_idx]
-                    for row_idx, value in enumerate(df[col_name]):
-                        if pd.notna(value):
-                            value_str = str(value).strip()
-                            if 'http' in value_str.lower() or 'www.' in value_str.lower():
-                                is_valid = is_booking_link(value_str)
-                                links_info.append({
-                                    'row': row_idx + 1,
-                                    'col': chr(65 + col_idx),
-                                    'link': value_str,
-                                    'cell_value': value_str,
-                                    'is_valid': is_valid,
-                                    'note': '' if is_valid else '⚠️Link không hợp lệ'
-                                })
+            # Fallback: đọc từ CSV theo format mới (A=Tên KS, B=Link)
+            if len(df.columns) > 1:
+                for row_idx in range(len(df)):
+                    hotel_name = str(df.iloc[row_idx, 0]).strip() if pd.notna(df.iloc[row_idx, 0]) else ''
+                    link_value = df.iloc[row_idx, 1]
+                    
+                    if pd.notna(link_value):
+                        value_str = str(link_value).strip()
+                        if 'http' in value_str.lower() or 'www.' in value_str.lower():
+                            is_valid = is_booking_link(value_str)
+                            links_info.append({
+                                'row': row_idx + 1,
+                                'col': 'B',
+                                'link': value_str,
+                                'cell_value': value_str,
+                                'hotel_name': hotel_name,
+                                'is_valid': is_valid,
+                                'note': '' if is_valid else '⚠️Link không hợp lệ'
+                            })
         
         return df, links_info, None
     except Exception as e:

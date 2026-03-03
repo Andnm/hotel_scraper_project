@@ -145,12 +145,6 @@
                 currentPageReportTemplate="Trang {currentPage}/{totalPages} | Hiển thị {first}-{last} / {totalRecords} links"
                 responsiveLayout="scroll"
               >
-                <Column field="code" header="Mã số" :style="{ width: '120px' }">
-                  <template #body="slotProps">
-                    <span v-if="slotProps.data.code">{{ slotProps.data.code }}</span>
-                    <span v-else style="color: var(--text-color-secondary); font-style: italic;">-</span>
-                  </template>
-                </Column>
                 <Column field="market" header="Market" :style="{ width: '120px' }">
                   <template #body="slotProps">
                     <Tag severity="info">{{ slotProps.data.market }}</Tag>

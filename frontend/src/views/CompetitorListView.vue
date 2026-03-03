@@ -23,12 +23,11 @@
           filterDisplay="row"
           v-model:filters="filters"
         >
-          <Column field="code" header="Mã số" :sortable="true" style="min-width: 120px">
+          <Column field="hotel_name" header="Tên KS" style="min-width: 200px">
             <template #filter="{ filterModel, filterCallback }">
-              <InputText v-model="filterModel.value" @input="filterCallback()" placeholder="Tìm mã số" />
+              <InputText v-model="filterModel.value" @input="filterCallback()" placeholder="Tìm tên KS" />
             </template>
           </Column>
-          <Column field="hotel_name" header="Tên KS" style="min-width: 200px"></Column>
           <Column field="market" header="Market" style="width: 100px"></Column>
           <Column field="cluster" header="Cluster" style="width: 120px"></Column>
           <Column field="competitor_level" header="Level ĐT" style="width: 100px"></Column>
@@ -49,12 +48,6 @@
     <Dialog v-model:visible="showDialog" :header="dialogMode === 'create' ? 'Thêm Competitor' : dialogMode === 'edit' ? 'Sửa Competitor' : 'Chi tiết Competitor'" :style="{ width: '800px' }" modal>
       <div class="p-fluid">
         <div class="grid">
-          <div class="col-12 md:col-6">
-            <div class="field">
-              <label for="code">Mã số *</label>
-              <InputText v-model="formData.code" :disabled="dialogMode === 'edit' || dialogMode === 'view'" />
-            </div>
-          </div>
           <div class="col-12 md:col-6">
             <div class="field">
               <label for="market">Market</label>
@@ -170,7 +163,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const toast = useToast()
 
 interface CompetitorData {
-  code: string
+  id?: number
   hotel_name?: string
   hotel_link?: string
   room_type?: string
@@ -195,7 +188,6 @@ const saving = ref(false)
 const fileInput = ref<HTMLInputElement>()
 
 const formData = ref<CompetitorData>({
-  code: '',
   hotel_name: '',
   hotel_link: '',
   room_type: '',
@@ -213,7 +205,7 @@ const formData = ref<CompetitorData>({
 })
 
 const filters = ref({
-  code: { value: null, matchMode: 'contains' }
+  hotel_name: { value: null, matchMode: 'contains' }
 })
 
 // Config options - will be loaded from API
@@ -266,7 +258,6 @@ async function loadCompetitors() {
 function openCreateDialog() {
   dialogMode.value = 'create'
   formData.value = {
-    code: '',
     hotel_name: '',
     hotel_link: '',
     room_type: '',
@@ -298,11 +289,11 @@ function editCompetitor(competitor: CompetitorData) {
 }
 
 async function saveCompetitor() {
-  if (!formData.value.code) {
+  if (!formData.value.hotel_name || !formData.value.room_type) {
     toast.add({
       severity: 'warn',
       summary: 'Cảnh báo',
-      detail: 'Vui lòng nhập mã số',
+      detail: 'Vui lòng nhập tên khách sạn và tên hạng phòng',
       life: 3000
     })
     return
@@ -319,7 +310,7 @@ async function saveCompetitor() {
         life: 3000
       })
     } else {
-      await axios.put(`${API_BASE_URL}/api/competitors/${formData.value.code}`, formData.value)
+      await axios.put(`${API_BASE_URL}/api/competitors/${formData.value.id}`, formData.value)
       toast.add({
         severity: 'success',
         summary: 'Thành công',
@@ -342,10 +333,10 @@ async function saveCompetitor() {
 }
 
 async function deleteCompetitor(competitor: CompetitorData) {
-  if (!confirm(`Xóa competitor "${competitor.code}"?`)) return
+  if (!confirm(`Xóa competitor "${competitor.hotel_name}"?`)) return
 
   try {
-    await axios.delete(`${API_BASE_URL}/api/competitors/${competitor.code}`)
+    await axios.delete(`${API_BASE_URL}/api/competitors/${competitor.id}`)
     toast.add({
       severity: 'success',
       summary: 'Thành công',

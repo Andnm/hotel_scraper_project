@@ -8,7 +8,6 @@ import io
 router = APIRouter(prefix="/api/competitors", tags=["competitors"])
 
 class CompetitorData(BaseModel):
-    code: str
     hotel_name: Optional[str] = None
     hotel_link: Optional[str] = None
     room_type: Optional[str] = None
@@ -40,12 +39,12 @@ async def get_all_competitors(limit: int = 1000, offset: int = 0):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{code}")
-async def get_competitor_by_code(code: str):
-    """Get competitor by code"""
+@router.get("/{competitor_id}")
+async def get_competitor_by_id(competitor_id: int):
+    """Get competitor by ID"""
     try:
         repo = CompetitorListRepository()
-        competitor = repo.get_competitor_by_code(code)
+        competitor = repo.get_competitor_by_id(competitor_id)
         if competitor:
             return competitor
         else:
@@ -58,22 +57,17 @@ async def create_competitor(data: CompetitorData):
     """Create a new competitor"""
     try:
         repo = CompetitorListRepository()
-        # Check if code already exists
-        existing = repo.get_competitor_by_code(data.code)
-        if existing:
-            raise HTTPException(status_code=400, detail="Code already exists")
-        
         competitor_id = repo.create_competitor(data.dict())
         return {"id": competitor_id, "message": "Competitor created successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.put("/{code}")
-async def update_competitor(code: str, data: CompetitorData):
+@router.put("/{competitor_id}")
+async def update_competitor(competitor_id: int, data: CompetitorData):
     """Update an existing competitor"""
     try:
         repo = CompetitorListRepository()
-        success = repo.update_competitor(code, data.dict())
+        success = repo.update_competitor(competitor_id, data.dict())
         if success:
             return {"message": "Competitor updated successfully"}
         else:
@@ -81,12 +75,12 @@ async def update_competitor(code: str, data: CompetitorData):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/{code}")
-async def delete_competitor(code: str):
+@router.delete("/{competitor_id}")
+async def delete_competitor(competitor_id: int):
     """Delete a competitor"""
     try:
         repo = CompetitorListRepository()
-        success = repo.delete_competitor(code)
+        success = repo.delete_competitor(competitor_id)
         if success:
             return {"message": "Competitor deleted successfully"}
         else:
@@ -110,39 +104,37 @@ async def import_from_excel(file: UploadFile = File(...)):
         updated_count = 0
         errors = []
         
-        # Expected columns: A=Mã số, B=Tên khách sạn, C=Link, D=Tên hạng phòng, E=Số người, 
-        # F=Giường, G=Diện tích, H=Các lựa chọn, I=Tiện nghi, 
-        # J=Market, K=Cluster, L=Level đối thủ, M=Giá bao gồm bữa sáng, N=Nhóm hạng phòng, O=Level
+        # Expected columns: A=Tên khách sạn, B=Link, C=Tên hạng phòng, D=Số người, 
+        # E=Giường, F=Diện tích, G=Các lựa chọn, H=Tiện nghi, 
+        # I=Market, J=Cluster, K=Level đối thủ, L=Giá bao gồm bữa sáng, M=Nhóm hạng phòng, N=Level
         
         for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
             try:
-                if not row[0]:  # Skip if no code
+                if not row[0] or not row[2]:  # Skip if no hotel name or room type
                     continue
                 
                 data = {
-                    'code': str(row[0]) if row[0] else None,
-                    'hotel_name': str(row[1]) if row[1] else None,
-                    'hotel_link': str(row[2]) if row[2] else None,
-                    'room_type': str(row[3]) if row[3] else None,
-                    'num_people': int(row[4]) if row[4] else None,
-                    'bed_info': str(row[5]) if row[5] else None,
-                    'room_area': str(row[6]) if row[6] else None,
-                    'room_choices': str(row[7]) if row[7] else None,
-                    'popular_facilities': str(row[8]) if row[8] else None,
-                    'market': str(row[9]) if row[9] else None,
-                    'cluster': str(row[10]) if row[10] else None,
-                    'competitor_level': str(row[11]) if row[11] else None,
-                    'breakfast_included': str(row[12]) if row[12] else None,
-                    'room_group': str(row[13]) if row[13] else None,
-                    'level': str(row[14]) if row[14] else None,
+                    'hotel_name': str(row[0]) if row[0] else None,
+                    'hotel_link': str(row[1]) if row[1] else None,
+                    'room_type': str(row[2]) if row[2] else None,
+                    'num_people': int(row[3]) if row[3] else None,
+                    'bed_info': str(row[4]) if row[4] else None,
+                    'room_area': str(row[5]) if row[5] else None,
+                    'room_choices': str(row[6]) if row[6] else None,
+                    'popular_facilities': str(row[7]) if row[7] else None,
+                    'market': str(row[8]) if row[8] else None,
+                    'cluster': str(row[9]) if row[9] else None,
+                    'competitor_level': str(row[10]) if row[10] else None,
+                    'breakfast_included': str(row[11]) if row[11] else None,
+                    'room_group': str(row[12]) if row[12] else None,
+                    'level': str(row[13]) if row[13] else None,
                 }
                 
-                existing = repo.get_competitor_by_code(data['code'])
-                if existing:
-                    repo.update_competitor(data['code'], data)
+                # Use upsert_competitor which handles find + create/update automatically
+                result = repo.upsert_competitor(data)
+                if result['action'] == 'updated':
                     updated_count += 1
                 else:
-                    repo.create_competitor(data)
                     created_count += 1
                     
             except Exception as e:

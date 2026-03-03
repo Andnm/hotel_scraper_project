@@ -1,92 +1,97 @@
 <template>
   <div class="file-uploader">
     <div class="upload-section">
-      <label class="section-label">📂 Tải lên file Excel</label>
-      <FileUpload
-        ref="fileUploadRef"
-        mode="basic"
-        name="file"
-        accept=".xlsx,.xls"
-        :maxFileSize="10000000"
-        :auto="false"
-        chooseLabel="Chọn file Excel"
-        @select="handleFileSelect"
-        style="margin-top: 0.75rem"
-        :pt="{
-          chooseButton: {
-            root: { class: 'p-button-primary' }
-          }
-        }"
-      />
-
-      <div v-if="selectedFile" class="file-info-card">
-       
-        <div class="checkbox-wrapper">
-          <Checkbox 
-            v-model="saveForReuse"
-            inputId="saveForReuse"
-            binary
+      <div class="two-columns">
+        <!-- Excel Upload Section -->
+        <div class="column">
+          <label class="section-label">📂 Tải lên file Excel</label>
+          <FileUpload
+            ref="fileUploadRef"
+            mode="basic"
+            name="file"
+            accept=".xlsx,.xls"
+            :maxFileSize="10000000"
+            :auto="false"
+            chooseLabel="Chọn file Excel"
+            @select="handleFileSelect"
+            style="margin-top: 0.75rem"
+            :pt="{
+              chooseButton: {
+                root: { class: 'p-button-primary' }
+              }
+            }"
           />
-          <label for="saveForReuse" class="checkbox-label">Lưu file này để sử dụng lại sau</label>
+
+          <div v-if="selectedFile" class="file-info-card">
+           
+            <div class="checkbox-wrapper">
+              <Checkbox 
+                v-model="saveForReuse"
+                inputId="saveForReuse"
+                binary
+              />
+              <label for="saveForReuse" class="checkbox-label">Lưu file này để sử dụng lại sau</label>
+            </div>
+
+            <div v-if="saveForReuse" style="margin-top: 0.75rem">
+              <InputText
+                v-model="sourceName"
+                placeholder="Đặt tên cho nguồn dữ liệu này"
+                class="w-full"
+              />
+            </div>
+
+            <Button 
+              label="Tải lên và xử lý" 
+              icon="pi pi-upload"
+              class="w-full"
+              style="margin-top: 1rem"
+              @click="uploadFile"
+              :loading="uploading"
+              :disabled="uploading"
+            />
+          </div>
         </div>
 
-        <div v-if="saveForReuse" style="margin-top: 0.75rem">
+        <!-- Google Sheets Section -->
+        <div class="column">
+          <label class="section-label">🔗 Import từ Google Sheets</label>
           <InputText
-            v-model="sourceName"
-            placeholder="Đặt tên cho nguồn dữ liệu này"
+            v-model="googleSheetUrl"
+            placeholder="Nhập URL Google Sheet (ví dụ: https://docs.google.com/spreadsheets/d/...)"
             class="w-full"
+            style="margin-top: 0.75rem"
           />
+
+          <div v-if="googleSheetUrl" class="file-info-card">
+            <div class="checkbox-wrapper">
+              <Checkbox 
+                v-model="saveSheetForReuse"
+                inputId="saveSheetForReuse"
+                binary
+              />
+              <label for="saveSheetForReuse" class="checkbox-label">Lưu nguồn này để sử dụng lại sau</label>
+            </div>
+
+            <div v-if="saveSheetForReuse" style="margin-top: 0.75rem">
+              <InputText
+                v-model="sheetSourceName"
+                placeholder="Đặt tên cho nguồn Google Sheet này"
+                class="w-full"
+              />
+            </div>
+
+            <Button 
+              label="Import từ Google Sheets" 
+              icon="pi pi-link"
+              class="w-full"
+              style="margin-top: 1rem"
+              @click="importFromGoogleSheet"
+              :loading="uploading"
+              :disabled="uploading"
+            />
+          </div>
         </div>
-
-        <Button 
-          label="Tải lên và xử lý" 
-          icon="pi pi-upload"
-          class="w-full"
-          style="margin-top: 1rem"
-          @click="uploadFile"
-          :loading="uploading"
-          :disabled="uploading"
-        />
-      </div>
-
-      <div class="divider">
-        <span>HOẶC</span>
-      </div>
-
-      <label class="section-label">🔗 Import từ Google Sheets</label>
-      <div style="margin-top: 0.75rem">
-        <InputText
-          v-model="googleSheetUrl"
-          placeholder="Nhập URL Google Sheet (ví dụ: https://docs.google.com/spreadsheets/d/...)"
-          class="w-full"
-        />
-        
-        <div class="checkbox-wrapper" style="margin-top: 0.75rem">
-          <Checkbox 
-            v-model="saveSheetForReuse"
-            inputId="saveSheetForReuse"
-            binary
-          />
-          <label for="saveSheetForReuse" class="checkbox-label">Lưu nguồn này để sử dụng lại sau</label>
-        </div>
-
-        <div v-if="saveSheetForReuse" style="margin-top: 0.75rem">
-          <InputText
-            v-model="sheetSourceName"
-            placeholder="Đặt tên cho nguồn Google Sheet này"
-            class="w-full"
-          />
-        </div>
-
-        <Button 
-          label="Import từ Google Sheets" 
-          icon="pi pi-link"
-          class="w-full"
-          style="margin-top: 1rem"
-          @click="importFromGoogleSheet"
-          :loading="uploading"
-          :disabled="uploading || !googleSheetUrl"
-        />
       </div>
 
       <div class="divider">
@@ -280,6 +285,48 @@ function formatFileSize(bytes: number): string {
 </script>
 
 <style scoped>
+.two-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  align-items: start;
+  position: relative;
+}
+
+.two-columns::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--surface-300);
+  transform: translateX(-50%);
+}
+
+.column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 1rem;
+}
+
+@media (max-width: 768px) {
+  .two-columns {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .two-columns::before {
+    display: none;
+  }
+  
+  .column {
+    padding: 0;
+  }
+}
+
 .section-label {
   font-weight: 600;
   color: var(--text-color);

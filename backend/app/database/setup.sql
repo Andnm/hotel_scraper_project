@@ -3,7 +3,6 @@ DROP TABLE IF EXISTS crawl_history;
 DROP TABLE IF EXISTS saved_data_sources;
 DROP TABLE IF EXISTS competitor_list;
 DROP TABLE IF EXISTS config_items;
-DROP TABLE IF EXISTS market_cluster_mapping;
 
 -- Bảng lưu thông tin nguồn data (Excel hoặc Google Sheets)
 CREATE TABLE saved_data_sources (
@@ -39,7 +38,6 @@ CREATE TABLE crawl_history (
 CREATE TABLE crawl_data (
   id                   BIGINT AUTO_INCREMENT PRIMARY KEY,
   history_id           BIGINT NOT NULL,
-  code                 VARCHAR(100),
   hotel_name           TEXT,
   hotel_link           TEXT,
   popular_facilities   TEXT,
@@ -55,8 +53,7 @@ CREATE TABLE crawl_data (
   options              JSON,
   created_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (history_id) REFERENCES crawl_history(id) ON DELETE CASCADE,
-  INDEX idx_data_history_id (history_id),
-  INDEX idx_data_code (code)
+  INDEX idx_data_history_id (history_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Bảng config cho các dropdown values
@@ -71,22 +68,9 @@ CREATE TABLE config_items (
   INDEX idx_config_category (category)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Bảng mapping giữa Code và Market/Cluster
-CREATE TABLE market_cluster_mapping (
-  id          BIGINT AUTO_INCREMENT PRIMARY KEY,
-  code        VARCHAR(100) NOT NULL UNIQUE,
-  market      VARCHAR(100) NOT NULL,
-  cluster     VARCHAR(100) NOT NULL,
-  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_mapping_code (code),
-  INDEX idx_mapping_market (market)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Bảng competitor list
+-- Bảng competitor list (matching dựa trên hotel_name + room details)
 CREATE TABLE competitor_list (
   id                   BIGINT AUTO_INCREMENT PRIMARY KEY,
-  code                 VARCHAR(100) NOT NULL UNIQUE,
   hotel_name           TEXT,
   hotel_link           TEXT,
   room_type            TEXT,
@@ -103,8 +87,8 @@ CREATE TABLE competitor_list (
   level                VARCHAR(100),
   created_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_competitor_code (code),
-  INDEX idx_competitor_market (market)
+  INDEX idx_competitor_market (market),
+  INDEX idx_competitor_hotel (hotel_name(255), room_type(255))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SELECT 'Database setup completed successfully!' AS message;
