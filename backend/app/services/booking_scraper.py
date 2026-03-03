@@ -356,6 +356,110 @@ def force_vnd_currency(url):
         return url
 
 
+def get_sheets_from_google_spreadsheet(url):
+    """
+    Lấy danh sách tất cả sheets từ Google Spreadsheet.
+    Returns: dict {sheet_name: gid} hoặc None nếu lỗi
+    """
+    try:
+        match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', url)
+        if not match:
+            print("Cannot extract spreadsheet ID from URL")
+            return None
+        
+        spreadsheet_id = match.group(1)
+        
+        # Method 1: Try to get sheets from HTML page structure
+        try:
+            html_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
+            print(f"Fetching sheets info from: {html_url}")
+            response = requests.get(html_url, timeout=15)
+            
+            if response.status_code != 200:
+                print(f"Cannot access spreadsheet HTML, status: {response.status_code}")
+                return None
+            
+            content = response.text
+            sheets = {}
+            
+            # Try multiple patterns to find sheet info
+            # Pattern 1: Look for sheet data in format: ["SheetName",number,...]
+            # This appears in the _docs_flag_initialData variable
+            patterns_to_try = [
+                # Pattern: ["SheetName",gid, with constraints
+                r'\["([^"]{2,50})",\s*(\d+)',
+                # Pattern: Sheet tabs in HTML with data attributes  
+                r'data-sheet-name="([^"]+)"[^>]*data-sheet-id="(\d+)"',
+                # Pattern: In JavaScript object
+                r'"name":"([^"]+)","sheetId":(\d+)',
+            ]
+            
+            for pattern in patterns_to_try:
+                matches = re.findall(pattern, content)
+                if matches:
+                    print(f"Found {len(matches)} potential sheets with pattern: {pattern[:50]}")
+                    break
+            
+            if not matches:
+                print("No sheet patterns matched in HTML")
+                return None
+            
+            # Keywords to filter out (technical/system fields)
+            exclude_keywords = [
+                'docs.', 'http', 'www', '.com', 'security', 'access', 
+                'capabilities', 'metadata', 'settings', 'config', 'api',
+                'permissions', 'sharing', 'export', 'import', 'sync'
+            ]
+            
+            # Lọc để chỉ lấy những cái có vẻ là sheet names
+            seen_gids = set()
+            valid_count = 0
+            
+            for sheet_name, gid in matches:
+                # Skip if already seen
+                if gid in seen_gids:
+                    continue
+                
+                # Check if should exclude
+                should_exclude = any(kw in sheet_name.lower() for kw in exclude_keywords)
+                
+                # Validate sheet name
+                is_valid = (
+                    sheet_name and 
+                    not should_exclude and
+                    not sheet_name.startswith('_') and 
+                    2 <= len(sheet_name) <= 100 and  # Allow 2-char names like "VT"
+                    # Sheet names should not have special chars (except spaces, dashes, Vietnamese)
+                    not any(c in sheet_name for c in ['<', '>', '{', '}', '[', ']', '|', '\\', '/', '?', '*'])
+                )
+                
+                if is_valid:
+                    sheets[sheet_name] = gid
+                    seen_gids.add(gid)
+                    valid_count += 1
+                    print(f"  ✓ Sheet: '{sheet_name}' (gid={gid})")
+            
+            if sheets:
+                print(f"Successfully found {len(sheets)} valid sheets")
+                return sheets
+            else:
+                print(f"Found {len(matches)} matches but none passed validation")
+                # Debug: print some examples
+                for i, (name, gid) in enumerate(matches[:5]):
+                    print(f"  Example {i+1}: '{name}' (gid={gid})")
+                return None
+            
+        except Exception as e:
+            print(f"Error parsing sheets from HTML: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+        
+    except Exception as e:
+        print(f"Error in get_sheets_from_google_spreadsheet: {e}")
+        return None
+
+
 def load_google_sheet(url):
     """
     Tải dữ liệu từ Google Sheet.
@@ -367,36 +471,51 @@ def load_google_sheet(url):
             return None, None, "URL Google Sheets không hợp lệ"
         
         spreadsheet_id = match.group(1)
-
         gid_match = re.search(r'[#&]gid=([0-9]+)', url)
         gid = gid_match.group(1) if gid_match else '0'
 
-        csv_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid}"
-        csv_response = requests.get(csv_url, timeout=10)
-        csv_response.raise_for_status()
-        df = pd.read_csv(StringIO(csv_response.text), header=None)
-
+        df = None
         links_info = []
-
+        
+        # Method 1: Try CSV export (fastest but requires public access)
         try:
-            html_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=html&gid={gid}"
-            html_response = requests.get(html_url, timeout=10)
-            
-            if html_response.status_code == 200:
+            csv_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid}"
+            print(f"Trying CSV export: {csv_url}")
+            csv_response = requests.get(csv_url, timeout=10)
+            csv_response.raise_for_status()
+            df = pd.read_csv(StringIO(csv_response.text), header=None)
+            print(f"CSV loaded successfully: {len(df)} rows")
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 400:
+                print(f"CSV export failed with 400 - Sheet may not be public. Error: {e}")
+            else:
+                print(f"CSV export failed: {e}")
+            df = None
+        except Exception as e:
+            print(f"CSV export error: {e}")
+            df = None
+
+        # Method 2: Try HTML export for hyperlinks (works with most sheets)
+        if df is None or len(df) == 0:
+            try:
+                html_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=html&gid={gid}"
+                print(f"Trying HTML export: {html_url}")
+                html_response = requests.get(html_url, timeout=10)
+                html_response.raise_for_status()
+                
                 soup = BeautifulSoup(html_response.content, 'lxml')
-
-                for row_idx, tr in enumerate(soup.find_all('tr'), 1):
+                rows = soup.find_all('tr')
+                print(f"Found {len(rows)} rows in HTML")
+                
+                for row_idx, tr in enumerate(rows, 1):
                     cells = tr.find_all('td')
-                    # Format: A = Tên KS, B = Link
                     if len(cells) > 1:
-                        cell_a = cells[0]  # Cột A - Tên khách sạn
-                        cell_b = cells[1]  # Cột B - Link
+                        cell_a = cells[0]
+                        cell_b = cells[1]
                         
-                        # Lấy tên khách sạn từ cột A
                         hotel_name = cell_a.get_text(strip=True) if cell_a else ''
-
-                        # Lấy link từ cột B (ưu tiên text, không dùng hyperlink)
                         cell_text = cell_b.get_text(strip=True)
+                        
                         if 'http' in cell_text.lower() or 'www.' in cell_text.lower():
                             is_valid = is_booking_link(cell_text)
                             links_info.append({
@@ -408,41 +527,59 @@ def load_google_sheet(url):
                                 'is_valid': is_valid,
                                 'note': '' if is_valid else '⚠️Link không hợp lệ'
                             })
-            else:
-                pubhtml_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/pubhtml?gid={gid}"
-                html_response = requests.get(pubhtml_url, timeout=10)
                 
-                if html_response.status_code == 200:
-                    soup = BeautifulSoup(html_response.content, 'lxml')
+                if links_info:
+                    print(f"Found {len(links_info)} links from HTML")
+                    return df, links_info, None
                     
-                    for row_idx, tr in enumerate(soup.find_all('tr'), 1):
-                        cells = tr.find_all('td')
-                        # Format: A = Tên KS, B = Link
-                        if len(cells) > 1:
-                            cell_a = cells[0]  # Cột A - Tên khách sạn
-                            cell_b = cells[1]  # Cột B - Link
-                            
-                            # Lấy tên khách sạn từ cột A
-                            hotel_name = cell_a.get_text(strip=True) if cell_a else ''
-                            
-                            # Lấy link từ cột B (ưu tiên text, không dùng hyperlink)
-                            cell_text = cell_b.get_text(strip=True)
-                            if 'http' in cell_text.lower() or 'www.' in cell_text.lower():
-                                is_valid = is_booking_link(cell_text)
-                                links_info.append({
-                                    'row': row_idx,
-                                    'col': 'B',
-                                    'link': cell_text,
-                                    'cell_value': cell_text,
-                                    'hotel_name': hotel_name,
-                                    'is_valid': is_valid,
-                                    'note': '' if is_valid else '⚠️Link không hợp lệ'
-                                })
-        except Exception as e:
-            print(f"HTML extraction error: {e}")
+            except requests.exceptions.HTTPError as e:
+                print(f"HTML export failed: {e}")
+            except Exception as e:
+                print(f"HTML parse error: {e}")
 
+        # Method 3: Try pubhtml (for published sheets)
         if not links_info:
-            # Fallback: đọc từ CSV theo format mới (A=Tên KS, B=Link)
+            try:
+                pubhtml_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/pubhtml?gid={gid}"
+                print(f"Trying pubhtml: {pubhtml_url}")
+                html_response = requests.get(pubhtml_url, timeout=10)
+                html_response.raise_for_status()
+                
+                soup = BeautifulSoup(html_response.content, 'lxml')
+                rows = soup.find_all('tr')
+                print(f"Found {len(rows)} rows in pubhtml")
+                
+                for row_idx, tr in enumerate(rows, 1):
+                    cells = tr.find_all('td')
+                    if len(cells) > 1:
+                        cell_a = cells[0]
+                        cell_b = cells[1]
+                        
+                        hotel_name = cell_a.get_text(strip=True) if cell_a else ''
+                        cell_text = cell_b.get_text(strip=True)
+                        
+                        if 'http' in cell_text.lower() or 'www.' in cell_text.lower():
+                            is_valid = is_booking_link(cell_text)
+                            links_info.append({
+                                'row': row_idx,
+                                'col': 'B',
+                                'link': cell_text,
+                                'cell_value': cell_text,
+                                'hotel_name': hotel_name,
+                                'is_valid': is_valid,
+                                'note': '' if is_valid else '⚠️Link không hợp lệ'
+                            })
+                
+                if links_info:
+                    print(f"Found {len(links_info)} links from pubhtml")
+                    return df, links_info, None
+                    
+            except Exception as e:
+                print(f"Pubhtml error: {e}")
+
+        # Method 4: Fallback to CSV data if we got it
+        if df is not None and len(df) > 0 and not links_info:
+            print(f"Fallback to CSV parsing, columns: {len(df.columns)}")
             if len(df.columns) > 1:
                 for row_idx in range(len(df)):
                     hotel_name = str(df.iloc[row_idx, 0]).strip() if pd.notna(df.iloc[row_idx, 0]) else ''
@@ -461,10 +598,94 @@ def load_google_sheet(url):
                                 'is_valid': is_valid,
                                 'note': '' if is_valid else '⚠️Link không hợp lệ'
                             })
+                
+                if links_info:
+                    print(f"Found {len(links_info)} links from CSV fallback")
+                    return df, links_info, None
+        
+        # All methods failed
+        if not links_info:
+            error_msg = (
+                "Không thể đọc dữ liệu từ Google Sheet. "
+                "Vui lòng đảm bảo:\n"
+                "1. Sheet được share với quyền 'Anyone with the link can view'\n"
+                "2. Định dạng đúng: Cột A = Tên khách sạn, Cột B = Link\n"
+                "3. Có ít nhất 1 link trong cột B"
+            )
+            print(error_msg)
+            return None, None, error_msg
         
         return df, links_info, None
+        
     except Exception as e:
-        return None, None, f"Lỗi khi tải Google Sheets: {str(e)}"
+        error_msg = f"Lỗi khi tải Google Sheets: {str(e)}"
+        print(error_msg)
+        import traceback
+        traceback.print_exc()
+        return None, None, error_msg
+
+
+def load_google_sheet_all_sheets(url):
+    """
+    Tải dữ liệu từ TẤT CẢ các sheets trong Google Spreadsheet.
+    Returns: dict {sheet_name: links_info} or (None, error_message)
+    """
+    try:
+        print(f"Loading Google Sheets from URL: {url}")
+        sheets_dict = get_sheets_from_google_spreadsheet(url)
+        
+        if not sheets_dict:
+            # Fallback: chỉ đọc sheet hiện tại (single sheet mode)
+            print("Cannot parse multiple sheets, falling back to single sheet mode")
+            df, links_info, error = load_google_sheet(url)
+            if error:
+                print(f"Error loading single sheet: {error}")
+                return None, error
+            if not links_info:
+                print("No links found in single sheet")
+                return None, "Không tìm thấy link nào trong Google Sheet"
+            print(f"Found {len(links_info)} links in default sheet")
+            return {'Default': links_info}, None
+        
+        # Có multiple sheets, load từng sheet
+        all_sheets_data = {}
+        errors = []
+        
+        for sheet_name, gid in sheets_dict.items():
+            print(f"Loading sheet '{sheet_name}' (gid={gid})")
+            # Construct URL với gid cụ thể
+            match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', url)
+            spreadsheet_id = match.group(1)
+            sheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit#gid={gid}"
+            
+            df, links_info, error = load_google_sheet(sheet_url)
+            
+            if error:
+                print(f"Error loading sheet '{sheet_name}': {error}")
+                errors.append(f"{sheet_name}: {error}")
+            elif links_info:
+                print(f"Found {len(links_info)} links in sheet '{sheet_name}'")
+                all_sheets_data[sheet_name] = links_info
+            else:
+                print(f"No links found in sheet '{sheet_name}'")
+        
+        if all_sheets_data:
+            print(f"Successfully loaded {len(all_sheets_data)} sheets with total {sum(len(v) for v in all_sheets_data.values())} links")
+            return all_sheets_data, None
+        
+        # No data found in any sheet
+        error_msg = "Không tìm thấy link nào trong tất cả các sheets"
+        if errors:
+            error_msg += f". Lỗi: {'; '.join(errors)}"
+        print(error_msg)
+        return None, error_msg
+        
+    except Exception as e:
+        error_msg = f"Lỗi khi tải Google Sheets: {str(e)}"
+        print(error_msg)
+        import traceback
+        traceback.print_exc()
+        return None, error_msg
 
 
 def check_date_outdated(url):

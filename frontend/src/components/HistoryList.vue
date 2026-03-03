@@ -147,147 +147,13 @@
       </div>
     </Dialog>
 
-    <!-- Detail Dialog -->
-    <Dialog v-model:visible="showDetailDialog" :header="`Chi tiết phiên cào #${selectedHistoryId}`" :modal="true"
-      :style="{ width: '90vw' }">
-      <div v-if="historyStore.currentHistory">
-        <div class="detail-info mb-4">
-          <div class="info-item">
-            <strong>Ngày cào:</strong> {{ formatDate(historyStore.currentHistory.crawl_date) }}
-          </div>
-          <div class="info-item">
-            <strong>Nguồn:</strong> {{ historyStore.currentHistory.source.toUpperCase() }}
-          </div>
-          <div class="info-item">
-            <strong>Loại cào:</strong>
-            <Tag :severity="historyStore.currentHistory.scrape_type === 'info' ? 'info' : 'warning'"
-              style="margin-left: 0.5rem">
-              {{ historyStore.currentHistory.scrape_type === 'info' ? 'Thông tin' : 'Cào giá' }}
-            </Tag>
-          </div>
-          <div class="info-item" v-if="historyStore.currentHistory.market">
-            <strong>Market:</strong> {{ historyStore.currentHistory.market }}
-          </div>
-          <div class="info-item">
-            <strong>Tổng records:</strong> {{ historyStore.currentHistory.total_records }}
-          </div>
-        </div>
-
-        <DataTable :value="historyStore.currentHistoryData" :paginator="true" :rows="20"
-          :rowsPerPageOptions="[20, 50, 100]"
-          paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink JumpToPageInput CurrentPageReport RowsPerPageDropdown"
-          currentPageReportTemplate="Trang {currentPage}/{totalPages} | Hiển thị {first}-{last} / {totalRecords} dòng"
-          responsiveLayout="scroll" showGridlines>
-          <!-- Info Mode Columns -->
-          <template v-if="historyStore.currentHistory.scrape_type === 'info'">
-            <Column field="hotel_name" header="Khách sạn" :style="{ minWidth: '200px' }"></Column>
-            <Column field="hotel_link" header="Link" :style="{ width: '80px' }">
-              <template #body="slotProps">
-                <a :href="slotProps.data.hotel_link" target="_blank" v-if="slotProps.data.hotel_link">
-                  <Button icon="pi pi-external-link" text size="small" />
-                </a>
-              </template>
-            </Column>
-            <Column field="review_count" header="Số review" :style="{ width: '100px' }"></Column>
-            <Column field="review_score" header="Điểm" :style="{ width: '80px' }"></Column>
-            <Column field="popular_facilities" header="Tiện nghi" :style="{ minWidth: '200px' }">
-              <template #body="slotProps">
-                <div class="text-ellipsis" v-tooltip.top="slotProps.data.popular_facilities" style="cursor: help;">
-                  {{ slotProps.data.popular_facilities }}
-                </div>
-              </template>
-            </Column>
-            <Column field="room_type" header="Loại phòng" :style="{ minWidth: '200px' }"></Column>
-            <Column field="num_people" header="Số người" :style="{ width: '90px' }"></Column>
-            <Column field="bed_info" header="Giường" :style="{ minWidth: '150px' }"></Column>
-            <Column field="room_area" header="Diện tích" :style="{ width: '100px' }"></Column>
-            <Column field="room_choices" header="Các lựa chọn" :style="{ minWidth: '250px' }">
-              <template #body="slotProps">
-                <div class="text-ellipsis"
-                  v-tooltip.top="slotProps.data.options?.facilities || slotProps.data.room_choices"
-                  style="cursor: help;">
-                  {{ slotProps.data.options?.facilities || slotProps.data.room_choices }}
-                </div>
-              </template>
-            </Column>
-            <Column field="Market" header="Market" :style="{ width: '100px' }"></Column>
-            <Column field="Cluster" header="Cluster" :style="{ width: '120px' }"></Column>
-            <Column field="Level_doi_thu" header="Level ĐT" :style="{ width: '100px' }">
-              <template #body="slotProps">
-                {{ slotProps.data['Level đối thủ'] }}
-              </template>
-            </Column>
-            <Column field="Gia_bao_gom_bua_sang" header="Bữa sáng" :style="{ width: '100px' }">
-              <template #body="slotProps">
-                {{ slotProps.data['Giá bao gồm bữa sáng'] }}
-              </template>
-            </Column>
-            <Column field="Nhom_hang_phong" header="Nhóm HP" :style="{ width: '100px' }">
-              <template #body="slotProps">
-                {{ slotProps.data['Nhóm hạng phòng'] }}
-              </template>
-            </Column>
-            <Column field="Level" header="Level" :style="{ width: '100px' }"></Column>
-          </template>
-
-          <!-- Price Mode Columns -->
-          <template v-else>
-            <Column field="hotel_name" header="Khách sạn" :style="{ minWidth: '200px' }"></Column>
-            <Column field="room_type" header="Loại phòng" :style="{ minWidth: '200px' }"></Column>
-            <Column field="num_people" header="Số người" :style="{ width: '90px' }"></Column>
-            <Column field="price_after_discount" header="Giá sau giảm" :style="{ width: '140px' }">
-              <template #body="slotProps">
-                {{ formatPrice(slotProps.data.price_after_discount) }}
-              </template>
-            </Column>
-            <Column field="price_original" header="Giá gốc" :style="{ width: '140px' }">
-              <template #body="slotProps">
-                {{ formatPrice(slotProps.data.price_original) }}
-              </template>
-            </Column>
-            <Column field="discount_percent" header="Giảm giá" :style="{ width: '120px' }">
-              <template #body="slotProps">
-                <Tag v-if="slotProps.data.discount_percent" severity="success">
-                  {{ slotProps.data.discount_percent }}
-                </Tag>
-              </template>
-            </Column>
-            <Column field="Market" header="Market" :style="{ width: '100px' }"></Column>
-            <Column field="Cluster" header="Cluster" :style="{ width: '120px' }"></Column>
-            <Column field="Level_doi_thu" header="Level ĐT" :style="{ width: '100px' }">
-              <template #body="slotProps">
-                {{ slotProps.data['Level đối thủ'] }}
-              </template>
-            </Column>
-            <Column field="Gia_bao_gom_bua_sang" header="Bữa sáng" :style="{ width: '100px' }">
-              <template #body="slotProps">
-                {{ slotProps.data['Giá bao gồm bữa sáng'] }}
-              </template>
-            </Column>
-            <Column field="Nhom_hang_phong" header="Nhóm HP" :style="{ width: '100px' }">
-              <template #body="slotProps">
-                {{ slotProps.data['Nhóm hạng phòng'] }}
-              </template>
-            </Column>
-            <Column field="Level" header="Level" :style="{ width: '100px' }"></Column>
-            <Column field="hotel_link" header="Link" :style="{ width: '80px' }">
-              <template #body="slotProps">
-                <a :href="slotProps.data.hotel_link" target="_blank" v-if="slotProps.data.hotel_link">
-                  <Button icon="pi pi-external-link" text size="small" />
-                </a>
-              </template>
-            </Column>
-          </template>
-        </DataTable>
-      </div>
-    </Dialog>
-
     <Toast />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import { useHistoryStore } from '@/stores/history'
@@ -295,6 +161,7 @@ import Menu from 'primevue/menu'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+const router = useRouter()
 const historyStore = useHistoryStore()
 const toast = useToast()
 const confirm = useConfirm()
@@ -314,9 +181,7 @@ const scrapeTypeOptions = [
   { label: 'Cào giá', value: 'price' }
 ]
 
-const showDetailDialog = ref(false)
 const showLatestApiDialog = ref(false)
-const selectedHistoryId = ref<number | null>(null)
 
 // Menu management
 const menuRefs = ref<Record<number, any>>({})
@@ -478,19 +343,8 @@ function fallbackCopyToClipboard(url: string, type?: 'price' | 'info') {
   }
 }
 
-async function viewDetail(historyId: number) {
-  try {
-    selectedHistoryId.value = historyId
-    await historyStore.fetchHistoryDetail(historyId)
-    showDetailDialog.value = true
-  } catch (error: any) {
-    toast.add({
-      severity: 'error',
-      summary: 'Lỗi',
-      detail: 'Không thể tải chi tiết',
-      life: 3000
-    })
-  }
+function viewDetail(historyId: number) {
+  router.push({ name: 'history-detail', params: { id: historyId } })
 }
 
 async function exportExcel(historyId: number) {

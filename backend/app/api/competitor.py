@@ -102,7 +102,11 @@ async def import_from_excel(file: UploadFile = File(...)):
         repo = CompetitorListRepository()
         created_count = 0
         updated_count = 0
+        skipped_count = 0
         errors = []
+        
+        print(f"\n=== Starting Excel Import: {file.filename} ===")
+        print(f"Total rows in sheet: {sheet.max_row}")
         
         # Expected columns: A=Tên khách sạn, B=Link, C=Tên hạng phòng, D=Số người, 
         # E=Giường, F=Diện tích, G=Các lựa chọn, H=Tiện nghi, 
@@ -110,41 +114,113 @@ async def import_from_excel(file: UploadFile = File(...)):
         
         for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
             try:
-                if not row[0] or not row[2]:  # Skip if no hotel name or room type
+                # Validate row is a tuple/list
+                if not isinstance(row, (tuple, list)):
+                    error_msg = f"Invalid row type: {type(row).__name__}"
+                    errors.append({"row": row_idx, "error": error_msg})
+                    print(f"Row {row_idx}: ✗ {error_msg}")
                     continue
                 
+                # Check if row is empty
+                if not row or len(row) == 0:
+                    skipped_count += 1
+                    continue
+                
+                # Safe check for first cell
+                first_cell = row[0] if len(row) > 0 else None
+                second_cell = row[1] if len(row) > 1 else None
+                
+                # Skip rows with no hotel name AND no link
+                if not first_cell and not second_cell:
+                    skipped_count += 1
+                    continue
+                
+                # Must have at least hotel name
+                if not first_cell:
+                    print(f"Row {row_idx}: Skipped - No hotel name")
+                    skipped_count += 1
+                    continue
+                
+                # Helper function to safely get value from row
+                def get_value(idx, converter=str):
+                    try:
+                        if len(row) > idx and row[idx] is not None:
+                            value = row[idx]
+                            # Convert to string first for safety, then to target type
+                            if converter == int:
+                                return int(float(str(value)))
+                            else:
+                                return str(value).strip()
+                    except Exception as conv_error:
+                        print(f"    Conversion error at column {idx}: {conv_error}")
+                        return None
+                
+                # Parse all data BEFORE attempting to save
                 data = {
-                    'hotel_name': str(row[0]) if row[0] else None,
-                    'hotel_link': str(row[1]) if row[1] else None,
-                    'room_type': str(row[2]) if row[2] else None,
-                    'num_people': int(row[3]) if row[3] else None,
-                    'bed_info': str(row[4]) if row[4] else None,
-                    'room_area': str(row[5]) if row[5] else None,
-                    'room_choices': str(row[6]) if row[6] else None,
-                    'popular_facilities': str(row[7]) if row[7] else None,
-                    'market': str(row[8]) if row[8] else None,
-                    'cluster': str(row[9]) if row[9] else None,
-                    'competitor_level': str(row[10]) if row[10] else None,
-                    'breakfast_included': str(row[11]) if row[11] else None,
-                    'room_group': str(row[12]) if row[12] else None,
-                    'level': str(row[13]) if row[13] else None,
+                    'hotel_name': get_value(0, str),
+                    'hotel_link': get_value(1, str),
+                    'room_type': get_value(2, str),
+                    'num_people': get_value(3, int),
+                    'bed_info': get_value(4, str),
+                    'room_area': get_value(5, str),
+                    'room_choices': get_value(6, str),
+                    'popular_facilities': get_value(7, str),
+                    'market': get_value(8, str),
+                    'cluster': get_value(9, str),
+                    'competitor_level': get_value(10, str),
+                    'breakfast_included': get_value(11, str),
+                    'room_group': get_value(12, str),
+                    'level': get_value(13, str),
                 }
                 
-                # Use upsert_competitor which handles find + create/update automatically
-                result = repo.upsert_competitor(data)
-                if result['action'] == 'updated':
+                print(f"Row {row_idx}: Processing {data['hotel_name']}")
+                
+                # Only save if parsing was successful (no None for required fields)
+                if not data['hotel_name']:
+                    raise ValueError("Hotel name is required")
+                
+                # Check if competitor exists before upsert
+                existing = repo.find_competitor(
+                    hotel_name=data.get('hotel_name'),
+                    room_type=data.get('room_type'),
+                    num_people=data.get('num_people'),
+                    bed_info=data.get('bed_info'),
+                    room_area=data.get('room_area')
+                )
+                
+                # Use upsert_competitor which returns the ID
+                competitor_id = repo.upsert_competitor(data)
+                
+                if existing:
                     updated_count += 1
+                    print(f"  ✓ Updated (ID: {competitor_id})")
                 else:
                     created_count += 1
+                    print(f"  ✓ Created (ID: {competitor_id})")
                     
             except Exception as e:
-                errors.append(f"Row {row_idx}: {str(e)}")
+                error_msg = {"row": row_idx, "error": str(e)}
+                errors.append(error_msg)
+                print(f"Row {row_idx}: ✗ Error: {str(e)}")
         
-        return {
+        result = {
             "message": "Import completed",
             "created": created_count,
             "updated": updated_count,
+            "skipped": skipped_count,
             "errors": errors
         }
+        
+        print(f"\n=== Import Summary ===")
+        print(f"Created: {created_count}")
+        print(f"Updated: {updated_count}")
+        print(f"Skipped: {skipped_count}")
+        print(f"Errors: {len(errors)}")
+        
+        return result
+        
     except Exception as e:
+        print(f"Import failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

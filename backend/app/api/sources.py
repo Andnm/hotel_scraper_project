@@ -2,7 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from typing import List, Optional
 from pydantic import BaseModel
 from app.database.repositories import SavedDataSourceRepository
-from app.services.booking_scraper import extract_hyperlinks_from_excel, get_markets_from_excel, load_google_sheet
+from app.services.booking_scraper import extract_hyperlinks_from_excel, get_markets_from_excel
 import os
 from datetime import datetime
 
@@ -107,6 +107,38 @@ async def get_source(source_id: int):
                 "links": links,
                 "total_links": len(links)
             }
+        elif source['source_type'] == 'google_sheets' and source['sheets_url']:
+            # Load TẤT CẢ sheets từ Google Sheets
+            from app.services.booking_scraper import load_google_sheet_all_sheets
+            
+            all_sheets_data, error = load_google_sheet_all_sheets(source['sheets_url'])
+            
+            if error:
+                raise HTTPException(status_code=400, detail=error)
+            
+            if not all_sheets_data:
+                raise HTTPException(status_code=400, detail="Không tìm thấy link nào trong Google Sheet")
+            
+            # Format links theo cấu trúc mong muốn (giống Excel)
+            formatted_links = []
+            markets = list(all_sheets_data.keys())
+            
+            for market, links_info in all_sheets_data.items():
+                for link_data in links_info:
+                    formatted_links.append({
+                        "market": market,
+                        "hotel_name": link_data.get("hotel_name", ""),
+                        "cell_value": link_data.get("cell_value", ""),
+                        "link": link_data["link"],
+                        "is_valid": link_data["is_valid"]
+                    })
+            
+            return {
+                "source": source,
+                "markets": markets,
+                "links": formatted_links,
+                "total_links": len(formatted_links)
+            }
         else:
             raise HTTPException(status_code=400, detail="File không tồn tại hoặc source type không được hỗ trợ")
     
@@ -177,37 +209,50 @@ async def get_links_by_market(source_id: int, market: str):
 
 @router.post("/sources/import-google-sheet")
 async def import_google_sheet(request: GoogleSheetImportRequest):
-    """Import links từ Google Sheet"""
+    """Import links từ TẤT CẢ sheets trong Google Spreadsheet"""
     try:
-        # Load data từ Google Sheet
-        df, links_info, error = load_google_sheet(request.url)
+        # Load TẤT CẢ sheets từ Google Sheets
+        from app.services.booking_scraper import load_google_sheet_all_sheets
+        
+        all_sheets_data, error = load_google_sheet_all_sheets(request.url)
         
         if error:
+            # Enhance error message if it's a permission/access issue
+            if "400" in error or "Bad Request" in error or "access" in error.lower():
+                detailed_error = (
+                    f"{error}\n\n"
+                    "💡 Cách khắc phục:\n"
+                    "1. Mở Google Sheet và click nút 'Share' (góc trên phải)\n"
+                    "2. Chọn 'Anyone with the link' có quyền 'Viewer'\n"
+                    "3. Copy link và thử lại\n\n"
+                    "Hoặc tải xuống Excel (.xlsx) và upload file thay vì dùng link."
+                )
+                raise HTTPException(status_code=400, detail=detailed_error)
             raise HTTPException(status_code=400, detail=error)
         
-        if not links_info:
+        if not all_sheets_data:
             raise HTTPException(status_code=400, detail="Không tìm thấy link nào trong Google Sheet")
         
-        # Format links theo cấu trúc mong muốn
-        market = request.market or "Default"
+        # Format links theo cấu trúc mong muốn (giống Excel với nhiều markets)
         formatted_links = []
+        markets = list(all_sheets_data.keys())
         
-        for link_data in links_info:
-            formatted_links.append({
-                "market": market,
-                "hotel_name": link_data.get("hotel_name", ""),
-                "cell_value": link_data.get("cell_value", ""),
-                "link": link_data["link"],
-                "is_valid": link_data["is_valid"],
-                "code": None
-            })
+        for market, links_info in all_sheets_data.items():
+            for link_data in links_info:
+                formatted_links.append({
+                    "market": market,
+                    "hotel_name": link_data.get("hotel_name", ""),
+                    "cell_value": link_data.get("cell_value", ""),
+                    "link": link_data["link"],
+                    "is_valid": link_data["is_valid"]
+                })
         
         source_id = None
         
         # Nếu user muốn lưu lại để dùng sau
         if request.save_for_reuse:
             repo = SavedDataSourceRepository()
-            source_name = request.name or f"Google Sheet - {market}"
+            source_name = request.name or f"Google Sheet - {', '.join(markets[:3])}"
             source_id = repo.create_source(
                 name=source_name,
                 source_type='google_sheets',
@@ -216,7 +261,7 @@ async def import_google_sheet(request: GoogleSheetImportRequest):
         
         return {
             "success": True,
-            "markets": [market],
+            "markets": markets,
             "links": formatted_links,
             "total_links": len(formatted_links),
             "source_id": source_id

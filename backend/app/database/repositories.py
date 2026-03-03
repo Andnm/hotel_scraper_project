@@ -225,7 +225,6 @@ class CrawlDataRepository:
                     
                     values.append((
                         history_id,
-                        data.get('Mã số', ''),  # Code from Excel column A
                         data.get('Tên khách sạn', 'N/A'),
                         data.get('Link khách sạn', ''),
                         popular_facilities,
@@ -243,11 +242,11 @@ class CrawlDataRepository:
                 
                 query = """
                     INSERT INTO crawl_data (
-                        history_id, code, hotel_name, hotel_link, popular_facilities,
+                        history_id, hotel_name, hotel_link, popular_facilities,
                         price_after_discount, price_original, discount_percent,
                         review_count, review_score, room_type,
                         num_people, bed_info, room_area, options
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 
                 cursor.executemany(query, values)
@@ -269,20 +268,21 @@ class CrawlDataRepository:
                         cd.*,
                         ch.crawl_date,
                         ch.crawl_target,
-                        cl.market AS competitor_market,
-                        cl.cluster AS competitor_cluster,
-                        cl.competitor_level,
-                        cl.breakfast_included,
-                        cl.room_group,
-                        cl.level AS competitor_level_detail
+                        cl.market AS Market,
+                        cl.cluster AS Cluster,
+                        cl.competitor_level AS `Level đối thủ`,
+                        cl.breakfast_included AS `Giá bao gồm bữa sáng`,
+                        cl.room_group AS `Nhóm hạng phòng`,
+                        cl.level AS Level
                     FROM crawl_data cd
                     JOIN crawl_history ch ON cd.history_id = ch.id
                     LEFT JOIN competitor_list cl ON 
-                        cd.hotel_name = cl.hotel_name 
-                        AND cd.room_type = cl.room_type
-                        AND (cl.num_people IS NULL OR cd.num_people = cl.num_people)
-                        AND (cl.bed_info IS NULL OR cl.bed_info = '' OR cd.bed_info = cl.bed_info)
-                        AND (cl.room_area IS NULL OR cl.room_area = '' OR cd.room_area = cl.room_area)
+                        TRIM(cd.hotel_name) = TRIM(cl.hotel_name) 
+                        AND (
+                            cl.room_type IS NULL 
+                            OR cl.room_type = '' 
+                            OR TRIM(cd.room_type) = TRIM(cl.room_type)
+                        )
                     WHERE cd.history_id = %s 
                     ORDER BY cd.id 
                     LIMIT %s OFFSET %s
@@ -325,20 +325,21 @@ class CrawlDataRepository:
                         ch.check_in,
                         ch.check_out,
                         ch.scrape_type,
-                        cl.market AS competitor_market,
-                        cl.cluster AS competitor_cluster,
-                        cl.competitor_level,
-                        cl.breakfast_included,
-                        cl.room_group,
-                        cl.level AS competitor_level_detail
+                        cl.market AS Market,
+                        cl.cluster AS Cluster,
+                        cl.competitor_level AS `Level đối thủ`,
+                        cl.breakfast_included AS `Giá bao gồm bữa sáng`,
+                        cl.room_group AS `Nhóm hạng phòng`,
+                        cl.level AS Level
                     FROM crawl_data cd
                     JOIN crawl_history ch ON cd.history_id = ch.id
                     LEFT JOIN competitor_list cl ON 
-                        cd.hotel_name = cl.hotel_name 
-                        AND cd.room_type = cl.room_type
-                        AND (cl.num_people IS NULL OR cd.num_people = cl.num_people)
-                        AND (cl.bed_info IS NULL OR cl.bed_info = '' OR cd.bed_info = cl.bed_info)
-                        AND (cl.room_area IS NULL OR cl.room_area = '' OR cd.room_area = cl.room_area)
+                        TRIM(cd.hotel_name) = TRIM(cl.hotel_name) 
+                        AND (
+                            cl.room_type IS NULL 
+                            OR cl.room_type = '' 
+                            OR TRIM(cd.room_type) = TRIM(cl.room_type)
+                        )
                     WHERE cd.history_id = %s
                     ORDER BY cd.id
                 """
@@ -363,9 +364,22 @@ class CrawlDataRepository:
                     SELECT 
                         cd.*,
                         ch.crawl_date,
-                        ch.crawl_target
+                        ch.crawl_target,
+                        cl.market AS Market,
+                        cl.cluster AS Cluster,
+                        cl.competitor_level AS `Level đối thủ`,
+                        cl.breakfast_included AS `Giá bao gồm bữa sáng`,
+                        cl.room_group AS `Nhóm hạng phòng`,
+                        cl.level AS Level
                     FROM crawl_data cd
                     JOIN crawl_history ch ON cd.history_id = ch.id
+                    LEFT JOIN competitor_list cl ON 
+                        TRIM(cd.hotel_name) = TRIM(cl.hotel_name) 
+                        AND (
+                            cl.room_type IS NULL 
+                            OR cl.room_type = '' 
+                            OR TRIM(cd.room_type) = TRIM(cl.room_type)
+                        )
                     ORDER BY ch.created_at, cd.id
                 """
                 cursor.execute(query)
@@ -394,9 +408,22 @@ class CrawlDataRepository:
                     SELECT 
                         cd.*,
                         ch.crawl_date,
-                        ch.crawl_target
+                        ch.crawl_target,
+                        cl.market AS Market,
+                        cl.cluster AS Cluster,
+                        cl.competitor_level AS `Level đối thủ`,
+                        cl.breakfast_included AS `Giá bao gồm bữa sáng`,
+                        cl.room_group AS `Nhóm hạng phòng`,
+                        cl.level AS Level
                     FROM crawl_data cd
                     JOIN crawl_history ch ON cd.history_id = ch.id
+                    LEFT JOIN competitor_list cl ON 
+                        TRIM(cd.hotel_name) = TRIM(cl.hotel_name) 
+                        AND (
+                            cl.room_type IS NULL 
+                            OR cl.room_type = '' 
+                            OR TRIM(cd.room_type) = TRIM(cl.room_type)
+                        )
                     WHERE 1=1
                 """
                 params = []

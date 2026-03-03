@@ -336,10 +336,10 @@ function formatFileSize(bytes: number): string {
 
 .file-info-card {
   padding: 1.25rem;
+  padding-top: 0px;
   background: var(--surface-50);
   border: 2px solid var(--surface-200);
   border-radius: 8px;
-  margin-top: 1rem;
 }
 
 .checkbox-wrapper {

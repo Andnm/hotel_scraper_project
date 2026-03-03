@@ -17,32 +17,134 @@
           :paginator="true" 
           :rows="20"
           :loading="loading"
-          responsiveLayout="scroll"
+          scrollable
+          scrollHeight="600px"
           paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
           :rowsPerPageOptions="[10,20,50]"
           filterDisplay="row"
           v-model:filters="filters"
         >
-          <Column field="hotel_name" header="Tên KS" style="min-width: 200px">
+          <!-- 1. Tên khách sạn -->
+          <Column field="hotel_name" header="Tên khách sạn" :frozen="true" style="min-width: 200px" :sortable="true">
             <template #filter="{ filterModel, filterCallback }">
-              <InputText v-model="filterModel.value" @input="filterCallback()" placeholder="Tìm tên KS" />
+              <InputText v-model="filterModel.value" @input="filterCallback()" placeholder="Tìm tên KS" class="p-column-filter" />
             </template>
           </Column>
-          <Column field="market" header="Market" style="width: 100px"></Column>
-          <Column field="cluster" header="Cluster" style="width: 120px"></Column>
-          <Column field="competitor_level" header="Level ĐT" style="width: 100px"></Column>
-          <Column header="Thao tác" style="width: 150px">
+          
+          <!-- 2. Link khách sạn -->
+          <Column field="hotel_link" header="Link khách sạn" style="min-width: 150px" :sortable="true">
             <template #body="slotProps">
-              <div style="display: flex; gap: 0.75rem; align-items: center;">
-                <Button icon="pi pi-eye" class="p-button-sm" severity="primary" @click="viewCompetitor(slotProps.data)" v-tooltip.top="'Xem'" />
-                <Button icon="pi pi-pencil" class="p-button-sm" severity="primary" @click="editCompetitor(slotProps.data)" v-tooltip.top="'Sửa'" />
-                <Button icon="pi pi-trash" class="p-button-sm p-button-danger" @click="deleteCompetitor(slotProps.data)" v-tooltip.top="'Xóa'" />
-              </div>
+              <a v-if="slotProps.data.hotel_link" :href="slotProps.data.hotel_link" target="_blank" class="text-primary" style="text-decoration: underline;">
+                <i class="pi pi-external-link"></i> Link
+              </a>
+            </template>
+            <template #filter="{ filterModel, filterCallback }">
+              <InputText v-model="filterModel.value" @input="filterCallback()" placeholder="Tìm link" class="p-column-filter" />
+            </template>
+          </Column>
+          
+          <!-- 3. Tên hạng phòng -->
+          <Column field="room_type" header="Tên hạng phòng" style="min-width: 180px" :sortable="true">
+            <template #filter="{ filterModel, filterCallback }">
+              <InputText v-model="filterModel.value" @input="filterCallback()" placeholder="Tìm hạng phòng" class="p-column-filter" />
+            </template>
+          </Column>
+          
+          <!-- 4. Số lượng người -->
+          <Column field="num_people" header="Số người" style="width: 100px" :sortable="true"></Column>
+          
+          <!-- 5. Giường -->
+          <Column field="bed_info" header="Giường" style="min-width: 150px" :sortable="true"></Column>
+          
+          <!-- 6. Diện tích phòng -->
+          <Column field="room_area" header="Diện tích" style="width: 120px" :sortable="true"></Column>
+          
+          <!-- 7. Các lựa chọn -->
+          <Column field="room_choices" header="Các lựa chọn" style="min-width: 200px" :sortable="true">
+            <template #body="slotProps">
+              <div style="max-height: 60px; overflow-y: auto;">{{ slotProps.data.room_choices }}</div>
+            </template>
+          </Column>
+          
+          <!-- 8. Các tiện nghi được ưa chuộng nhất -->
+          <Column field="popular_facilities" header="Tiện nghi" style="min-width: 200px" :sortable="true">
+            <template #body="slotProps">
+              <div style="max-height: 60px; overflow-y: auto;">{{ slotProps.data.popular_facilities }}</div>
+            </template>
+          </Column>
+          
+          <!-- 9. Market -->
+          <Column field="market" header="Market" style="width: 150px" :sortable="true">
+            <template #body="slotProps">
+              {{ getConfigLabel(marketOptions, slotProps.data.market) }}
+            </template>
+            <template #filter="{ filterModel, filterCallback }">
+              <MultiSelect v-model="filterModel.value" @change="filterCallback()" :options="marketOptions" optionLabel="label" optionValue="value" placeholder="Chọn market" :maxSelectedLabels="1" class="p-column-filter" display="chip" />
+            </template>
+          </Column>
+          
+          <!-- 10. Cluster -->
+          <Column field="cluster" header="Cluster" style="width: 150px" :sortable="true">
+            <template #body="slotProps">
+              {{ getConfigLabel(clusterOptions, slotProps.data.cluster) }}
+            </template>
+            <template #filter="{ filterModel, filterCallback }">
+              <MultiSelect v-model="filterModel.value" @change="filterCallback()" :options="clusterOptions" optionLabel="label" optionValue="value" placeholder="Chọn cluster" :maxSelectedLabels="1" class="p-column-filter" display="chip" />
+            </template>
+          </Column>
+          
+          <!-- 11. Level đối thủ -->
+          <Column field="competitor_level" header="Level ĐT" style="width: 150px" :sortable="true">
+            <template #body="slotProps">
+              {{ getConfigLabel(competitorLevelOptions, slotProps.data.competitor_level) }}
+            </template>
+            <template #filter="{ filterModel, filterCallback }">
+              <MultiSelect v-model="filterModel.value" @change="filterCallback()" :options="competitorLevelOptions" optionLabel="label" optionValue="value" placeholder="Chọn level" :maxSelectedLabels="1" class="p-column-filter" display="chip" />
+            </template>
+          </Column>
+          
+          <!-- 12. Giá bao gồm bữa sáng -->
+          <Column field="breakfast_included" header="Giá bao gồm bữa sáng" style="width: 180px" :sortable="true">
+            <template #body="slotProps">
+              {{ getConfigLabel(breakfastOptions, slotProps.data.breakfast_included) }}
+            </template>
+            <template #filter="{ filterModel, filterCallback }">
+              <MultiSelect v-model="filterModel.value" @change="filterCallback()" :options="breakfastOptions" optionLabel="label" optionValue="value" placeholder="Chọn" :maxSelectedLabels="1" class="p-column-filter" display="chip" />
+            </template>
+          </Column>
+          
+          <!-- 13. Nhóm hạng phòng -->
+          <Column field="room_group" header="Nhóm hạng phòng" style="width: 170px" :sortable="true">
+            <template #body="slotProps">
+              {{ getConfigLabel(roomGroupOptions, slotProps.data.room_group) }}
+            </template>
+            <template #filter="{ filterModel, filterCallback }">
+              <MultiSelect v-model="filterModel.value" @change="filterCallback()" :options="roomGroupOptions" optionLabel="label" optionValue="value" placeholder="Chọn nhóm" :maxSelectedLabels="1" class="p-column-filter" display="chip" />
+            </template>
+          </Column>
+          
+          <!-- 14. Level -->
+          <Column field="level" header="Level" style="width: 120px" :sortable="true">
+            <template #body="slotProps">
+              {{ getConfigLabel(levelOptions, slotProps.data.level) }}
+            </template>
+            <template #filter="{ filterModel, filterCallback }">
+              <MultiSelect v-model="filterModel.value" @change="filterCallback()" :options="levelOptions" optionLabel="label" optionValue="value" placeholder="Chọn level" :maxSelectedLabels="1" class="p-column-filter" display="chip" />
+            </template>
+          </Column>
+          
+          <!-- Actions -->
+          <Column header="Thao tác" style="width: 100px" :frozen="true" alignFrozen="right">
+            <template #body="slotProps">
+              <Button icon="pi pi-ellipsis-h" class="p-button-sm p-button-text" @click="toggleMenu($event, slotProps.data)" />
             </template>
           </Column>
         </DataTable>
       </template>
     </Card>
+
+    <!-- Actions Menu -->
+    <Menu ref="menu" :model="menuItems" :popup="true" />
 
     <!-- Create/Edit Dialog -->
     <Dialog v-model:visible="showDialog" :header="dialogMode === 'create' ? 'Thêm Competitor' : dialogMode === 'edit' ? 'Sửa Competitor' : 'Chi tiết Competitor'" :style="{ width: '800px' }" modal>
@@ -140,6 +242,18 @@
       </template>
     </Dialog>
 
+    <!-- Import Errors Dialog -->
+    <Dialog v-model:visible="showErrorDialog" header="Lỗi Import" :style="{ width: '900px' }" modal>
+      <DataTable :value="importErrors" scrollable scrollHeight="400px" responsiveLayout="scroll">
+        <Column field="row" header="Hàng" style="width: 80px"></Column>
+        <Column field="error" header="Lỗi" style="min-width: 300px"></Column>
+      </DataTable>
+      <template #footer>
+        <Button label="Đóng" icon="pi pi-times" @click="showErrorDialog = false" severity="secondary" />
+      </template>
+    </Dialog>
+
+    <ConfirmDialog />
     <Toast />
   </div>
 </template>
@@ -147,6 +261,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
@@ -155,12 +271,17 @@ import Column from 'primevue/column'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
+import MultiSelect from 'primevue/multiselect'
 import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
 import Toast from 'primevue/toast'
+import ConfirmDialog from 'primevue/confirmdialog'
+import Menu from 'primevue/menu'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const toast = useToast()
+const confirm = useConfirm()
+const router = useRouter()
 
 interface CompetitorData {
   id?: number
@@ -186,6 +307,32 @@ const showDialog = ref(false)
 const dialogMode = ref<'create' | 'edit' | 'view'>('create')
 const saving = ref(false)
 const fileInput = ref<HTMLInputElement>()
+const showErrorDialog = ref(false)
+const importErrors = ref<Array<{ row: number, error: string }>>([])
+const menu = ref()
+const selectedCompetitor = ref<CompetitorData | null>(null)
+
+const menuItems = ref([
+  {
+    label: 'Xem chi tiết',
+    icon: 'pi pi-eye',
+    command: () => viewCompetitor()
+  },
+  {
+    label: 'Chỉnh sửa',
+    icon: 'pi pi-pencil',
+    command: () => editCompetitor()
+  },
+  {
+    separator: true
+  },
+  {
+    label: 'Xóa',
+    icon: 'pi pi-trash',
+    class: 'text-danger',
+    command: () => deleteCompetitor()
+  }
+])
 
 const formData = ref<CompetitorData>({
   hotel_name: '',
@@ -205,7 +352,15 @@ const formData = ref<CompetitorData>({
 })
 
 const filters = ref({
-  hotel_name: { value: null, matchMode: 'contains' }
+  hotel_name: { value: null, matchMode: 'contains' },
+  hotel_link: { value: null, matchMode: 'contains' },
+  room_type: { value: null, matchMode: 'contains' },
+  market: { value: null, matchMode: 'in' },
+  cluster: { value: null, matchMode: 'in' },
+  competitor_level: { value: null, matchMode: 'in' },
+  breakfast_included: { value: null, matchMode: 'in' },
+  room_group: { value: null, matchMode: 'in' },
+  level: { value: null, matchMode: 'in' }
 })
 
 // Config options - will be loaded from API
@@ -230,6 +385,12 @@ async function loadConfigOptions() {
   } catch (error) {
     console.error('Failed to load config options:', error)
   }
+}
+
+function getConfigLabel(options: Array<{ label: string, value: string }>, value: string | undefined): string {
+  if (!value) return ''
+  const option = options.find(o => o.value === value)
+  return option ? option.label : value
 }
 
 function triggerFileInput() {
@@ -276,16 +437,53 @@ function openCreateDialog() {
   showDialog.value = true
 }
 
-function viewCompetitor(competitor: CompetitorData) {
-  dialogMode.value = 'view'
-  formData.value = { ...competitor }
-  showDialog.value = true
+function toggleMenu(event: Event, competitor: CompetitorData) {
+  selectedCompetitor.value = competitor
+  menu.value.toggle(event)
 }
 
-function editCompetitor(competitor: CompetitorData) {
-  dialogMode.value = 'edit'
-  formData.value = { ...competitor }
-  showDialog.value = true
+function viewCompetitor() {
+  if (selectedCompetitor.value?.id) {
+    router.push({ name: 'competitor-view', params: { id: selectedCompetitor.value.id } })
+  }
+}
+
+function editCompetitor() {
+  if (selectedCompetitor.value?.id) {
+    router.push({ name: 'competitor-edit', params: { id: selectedCompetitor.value.id } })
+  }
+}
+
+async function deleteCompetitor() {
+  if (!selectedCompetitor.value) return
+
+  confirm.require({
+    message: `Bạn có chắc chắn muốn xóa competitor "${selectedCompetitor.value.hotel_name}"?`,
+    header: 'Xác nhận xóa',
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: 'Xóa',
+    rejectLabel: 'Hủy',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      try {
+        await axios.delete(`${API_BASE_URL}/api/competitors/${selectedCompetitor.value?.id}`)
+        toast.add({
+          severity: 'success',
+          summary: 'Thành công',
+          detail: 'Đã xóa competitor',
+          life: 3000
+        })
+        await loadCompetitors()
+      } catch (error: any) {
+        toast.add({
+          severity: 'error',
+          summary: 'Lỗi',
+          detail: 'Không thể xóa competitor',
+          life: 3000
+        })
+      }
+    }
+  })
 }
 
 async function saveCompetitor() {
@@ -332,28 +530,6 @@ async function saveCompetitor() {
   }
 }
 
-async function deleteCompetitor(competitor: CompetitorData) {
-  if (!confirm(`Xóa competitor "${competitor.hotel_name}"?`)) return
-
-  try {
-    await axios.delete(`${API_BASE_URL}/api/competitors/${competitor.id}`)
-    toast.add({
-      severity: 'success',
-      summary: 'Thành công',
-      detail: 'Đã xóa competitor',
-      life: 3000
-    })
-    await loadCompetitors()
-  } catch (error: any) {
-    toast.add({
-      severity: 'error',
-      summary: 'Lỗi',
-      detail: 'Không thể xóa competitor',
-      life: 3000
-    })
-  }
-}
-
 async function handleFileUpload(event: Event) {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
@@ -368,15 +544,33 @@ async function handleFileUpload(event: Event) {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
 
+    const message = response.data.skipped > 0 
+      ? `Đã tạo: ${response.data.created}, Cập nhật: ${response.data.updated}, Bỏ qua: ${response.data.skipped}`
+      : `Đã tạo: ${response.data.created}, Cập nhật: ${response.data.updated}`
+
     toast.add({
-      severity: 'success',
-      summary: 'Import thành công',
-      detail: `Đã tạo: ${response.data.created}, Cập nhật: ${response.data.updated}`,
+      severity: response.data.errors && response.data.errors.length > 0 ? 'warn' : 'success',
+      summary: 'Import hoàn tất',
+      detail: message,
       life: 5000
     })
 
     if (response.data.errors && response.data.errors.length > 0) {
-      console.error('Import errors:', response.data.errors)
+      // Errors now come as objects with row and error fields
+      importErrors.value = response.data.errors.map((err: any) => {
+        if (typeof err === 'object' && err.row && err.error) {
+          return err
+        } else if (typeof err === 'string') {
+          // Fallback for old format
+          const match = err.match(/Row (\d+): (.+)/)
+          if (match) {
+            return { row: parseInt(match[1]), error: match[2] }
+          }
+          return { row: 0, error: err }
+        }
+        return { row: 0, error: String(err) }
+      })
+      showErrorDialog.value = true
     }
 
     await loadCompetitors()
@@ -403,5 +597,23 @@ onMounted(async () => {
 <style scoped>
 .competitor-list-view {
   padding: 2rem 0;
+}
+
+:deep(.p-column-filter) {
+  width: 100%;
+}
+
+:deep(.p-datatable .p-datatable-tbody > tr > td) {
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+:deep(.text-primary) {
+  color: #3b82f6;
+  cursor: pointer;
+}
+
+:deep(.text-primary:hover) {
+  color: #2563eb;
 }
 </style>

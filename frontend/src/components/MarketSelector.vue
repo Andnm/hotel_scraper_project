@@ -98,4 +98,45 @@ watch(() => props.modelValue, (newVal) => {
   color: var(--text-color);
   display: block;
 }
+
+/* Enhanced styling for market selector */
+:deep(.p-dropdown) {
+  border-width: 2px;
+}
+
+:deep(.p-dropdown:not(.p-disabled):hover) {
+  border-color: var(--primary-color);
+}
+
+:deep(.p-dropdown-panel) {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* Style for selected option in dropdown list */
+:deep(.p-dropdown-item.p-highlight) {
+  background-color: var(--primary-color) !important;
+  color: white !important;
+  font-weight: 600;
+}
+
+:deep(.p-dropdown-item.p-highlight i) {
+  color: white !important;
+}
+
+:deep(.p-dropdown-item.p-highlight .p-tag) {
+  background-color: rgba(255, 255, 255, 0.25);
+  color: white;
+  font-weight: 600;
+}
+
+/* Hover effect for non-selected items */
+:deep(.p-dropdown-item:not(.p-highlight):hover) {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* Style for the selected value display */
+:deep(.p-dropdown-label) {
+  font-weight: 500;
+}
 </style>
+

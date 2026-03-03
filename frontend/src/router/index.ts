@@ -15,6 +15,16 @@ const router = createRouter({
       component: () => import('../views/CompetitorListView.vue')
     },
     {
+      path: '/competitor/:id/view',
+      name: 'competitor-view',
+      component: () => import('../views/CompetitorDetailView.vue')
+    },
+    {
+      path: '/competitor/:id/edit',
+      name: 'competitor-edit',
+      component: () => import('../views/CompetitorEditView.vue')
+    },
+    {
       path: '/config',
       name: 'config',
       component: () => import('../views/ConfigView.vue')
@@ -23,6 +33,11 @@ const router = createRouter({
       path: '/history',
       name: 'history',
       component: () => import('../views/HistoryView.vue')
+    },
+    {
+      path: '/history/:id',
+      name: 'history-detail',
+      component: () => import('../views/HistoryDetailView.vue')
     },
     {
       path: '/tracking',
