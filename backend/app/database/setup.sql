@@ -1,8 +1,8 @@
-DROP TABLE IF EXISTS crawl_history;
-DROP TABLE IF EXISTS crawl_data;
-DROP TABLE IF EXISTS saved_data_sources;
-DROP TABLE IF EXISTS competitor_list;
-DROP TABLE IF EXISTS config_items;
+-- DROP TABLE IF EXISTS crawl_history;
+-- DROP TABLE IF EXISTS crawl_data;
+-- DROP TABLE IF EXISTS saved_data_sources;
+-- DROP TABLE IF EXISTS competitor_list;
+-- DROP TABLE IF EXISTS config_items;
 
 -- Bảng lưu thông tin nguồn data (Excel hoặc Google Sheets)
 
