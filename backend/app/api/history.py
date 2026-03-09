@@ -14,8 +14,7 @@ async def get_histories(
     source: Optional[str] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    scrape_type: Optional[str] = None,
-    market: Optional[str] = None
+    scrape_type: Optional[str] = None
 ):
     try:
         history_repo = CrawlHistoryRepository()
@@ -24,8 +23,7 @@ async def get_histories(
             source_filter=source,
             date_from=date_from,
             date_to=date_to,
-            scrape_type=scrape_type,
-            market=market
+            scrape_type=scrape_type
         )
         
         offset = (page - 1) * page_size
@@ -36,8 +34,7 @@ async def get_histories(
             source_filter=source,
             date_from=date_from,
             date_to=date_to,
-            scrape_type=scrape_type,
-            market=market
+            scrape_type=scrape_type
         )
         
         return {

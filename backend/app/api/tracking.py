@@ -1,11 +1,24 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
+from pydantic import BaseModel
 from app.database.repositories import TrackingRepository
 from app.core.database import get_db
 
 router = APIRouter()
 tracking_repo = TrackingRepository(get_db())
+
+
+class TrackingDataRequest(BaseModel):
+    history_id: int
+    year: int
+    month: int
+    market: str
+    cluster: str
+    breakfast: str
+    room_group: str
+    level: str
+    compare_history_id: Optional[int] = None
 
 
 @router.get("/history-list")
@@ -24,53 +37,43 @@ async def get_tracking_history_list():
 
 
 @router.post("/data")
-async def get_tracking_data(
-    history_id: int,
-    year: int,
-    month: int,
-    market: str,
-    cluster: str,
-    breakfast: str,
-    room_group: str,
-    level: str,
-    compare_history_id: Optional[int] = None
-):
+async def get_tracking_data(request: TrackingDataRequest):
     """
     Lấy dữ liệu tracking với filters
     """
     try:
         # Validate month
-        if month < 1 or month > 12:
+        if request.month < 1 or request.month > 12:
             raise HTTPException(status_code=400, detail="Tháng không hợp lệ")
         
         # Get main data
         main_data = tracking_repo.get_tracking_data(
-            history_id=history_id,
-            year=year,
-            month=month,
-            market=market,
-            cluster=cluster,
-            breakfast=breakfast,
-            room_group=room_group,
-            level=level
+            history_id=request.history_id,
+            year=request.year,
+            month=request.month,
+            market=request.market,
+            cluster=request.cluster,
+            breakfast=request.breakfast,
+            room_group=request.room_group,
+            level=request.level
         )
         
         # Get compare data if requested
         compare_data = None
-        if compare_history_id:
+        if request.compare_history_id:
             compare_data = tracking_repo.get_tracking_data(
-                history_id=compare_history_id,
-                year=year,
-                month=month,
-                market=market,
-                cluster=cluster,
-                breakfast=breakfast,
-                room_group=room_group,
-                level=level
+                history_id=request.compare_history_id,
+                year=request.year,
+                month=request.month,
+                market=request.market,
+                cluster=request.cluster,
+                breakfast=request.breakfast,
+                room_group=request.room_group,
+                level=request.level
             )
         
         # Generate date columns for the month
-        date_columns = tracking_repo.generate_month_dates(year, month)
+        date_columns = tracking_repo.generate_month_dates(request.year, request.month)
         
         return {
             "success": True,

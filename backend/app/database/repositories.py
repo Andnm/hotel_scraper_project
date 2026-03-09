@@ -8,12 +8,8 @@ class CrawlHistoryRepository:
     def create_history(
         self, 
         crawl_date: date, 
-        crawl_target: str, 
         source: str = 'booking',
-        scrape_type: str = 'info',
-        market: str = None,
-        check_in: date = None,
-        check_out: date = None
+        scrape_type: str = 'info'
     ) -> int:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -23,18 +19,14 @@ class CrawlHistoryRepository:
                 
                 query = """
                     INSERT INTO crawl_history 
-                    (crawl_date, crawl_time, crawl_target, source, scrape_type, market, check_in, check_out, total_records)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0)
+                    (crawl_date, crawl_time, source, scrape_type, total_records)
+                    VALUES (%s, %s, %s, %s, 0)
                 """
                 cursor.execute(query, (
                     crawl_date, 
                     crawl_time,
-                    crawl_target, 
                     source, 
-                    scrape_type,
-                    market,
-                    check_in,
-                    check_out
+                    scrape_type
                 ))
                 conn.commit()
                 history_id = cursor.lastrowid
@@ -52,8 +44,7 @@ class CrawlHistoryRepository:
         source_filter: Optional[str] = None, 
         date_from: Optional[date] = None, 
         date_to: Optional[date] = None,
-        scrape_type: Optional[str] = None,
-        market: Optional[str] = None
+        scrape_type: Optional[str] = None
     ) -> List[Dict]:
         with get_db_connection() as conn:
             cursor = conn.cursor(dictionary=True)
@@ -76,10 +67,6 @@ class CrawlHistoryRepository:
                 if scrape_type and scrape_type.lower() != "all":
                     query += " AND scrape_type = %s"
                     params.append(scrape_type.lower())
-
-                if market:
-                    query += " AND market LIKE %s"
-                    params.append(f"%{market}%")
                 
                 query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
                 params.extend([limit, offset])
@@ -136,8 +123,7 @@ class CrawlHistoryRepository:
         source_filter: Optional[str] = None, 
         date_from: Optional[date] = None, 
         date_to: Optional[date] = None,
-        scrape_type: Optional[str] = None,
-        market: Optional[str] = None
+        scrape_type: Optional[str] = None
     ) -> int:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -160,10 +146,6 @@ class CrawlHistoryRepository:
                 if scrape_type and scrape_type.lower() != "all":
                     query += " AND scrape_type = %s"
                     params.append(scrape_type.lower())
-
-                if market:
-                    query += " AND market LIKE %s"
-                    params.append(f"%{market}%")
                 
                 cursor.execute(query, params)
                 count = cursor.fetchone()[0]
@@ -213,6 +195,10 @@ class CrawlDataRepository:
                     review_score = self._parse_float(data.get('Điểm review', 'N/A'))
                     num_people = self._parse_int(data.get('Số lượng người', 'N/A'))
                     
+                    # Get check-in/check-out dates
+                    check_in = data.get('Check in', None)
+                    check_out = data.get('Check out', None)
+                    
                     options = {
                         'row_number': data.get('Hàng_gốc'),
                         'facilities': data.get('Các lựa chọn', 'N/A'),
@@ -222,6 +208,10 @@ class CrawlDataRepository:
                     popular_facilities = data.get('Các tiện nghi được ưa chuộng nhất', '')
                     if isinstance(popular_facilities, list):
                         popular_facilities = ', '.join(popular_facilities)
+                    
+                    room_choices = data.get('Các lựa chọn', '')
+                    if isinstance(room_choices, list):
+                        room_choices = ', '.join(room_choices)
                     
                     values.append((
                         history_id,
@@ -237,6 +227,9 @@ class CrawlDataRepository:
                         num_people,
                         data.get('Giường', 'N/A'),
                         data.get('Diện tích phòng', 'N/A'),
+                        room_choices,
+                        check_in,
+                        check_out,
                         json.dumps(options, ensure_ascii=False)
                     ))
                 
@@ -245,8 +238,9 @@ class CrawlDataRepository:
                         history_id, hotel_name, hotel_link, popular_facilities,
                         price_after_discount, price_original, discount_percent,
                         review_count, review_score, room_type,
-                        num_people, bed_info, room_area, options
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        num_people, bed_info, room_area, room_choices,
+                        check_in, check_out, options
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 
                 cursor.executemany(query, values)
@@ -267,7 +261,9 @@ class CrawlDataRepository:
                     SELECT 
                         cd.*,
                         ch.crawl_date,
-                        ch.crawl_target,
+                        ch.crawl_time,
+                        ch.source,
+                        ch.scrape_type,
                         cl.market AS Market,
                         cl.cluster AS Cluster,
                         cl.competitor_level AS `Level đối thủ`,
@@ -875,7 +871,7 @@ class TrackingRepository:
             cursor = conn.cursor(dictionary=True)
             try:
                 query = """
-                    SELECT id, crawl_date, crawl_time, source, market, check_in, check_out
+                    SELECT id, crawl_date, crawl_time, source, scrape_type
                     FROM crawl_history
                     WHERE scrape_type = 'price'
                     ORDER BY crawl_date DESC, crawl_time DESC
@@ -904,7 +900,6 @@ class TrackingRepository:
                     SELECT 
                         cd.hotel_name,
                         cd.room_type,
-                        cd.check_in,
                         cd.price_after_discount,
                         cl.market AS Market,
                         cl.cluster AS Cluster,
@@ -922,11 +917,9 @@ class TrackingRepository:
                         AND cl.breakfast_included = %s
                         AND cl.room_group = %s
                         AND cl.level = %s
-                        AND YEAR(cd.check_in) = %s
-                        AND MONTH(cd.check_in) = %s
-                    ORDER BY cd.hotel_name, cd.room_type, cd.check_in
+                    ORDER BY cd.hotel_name, cd.room_type
                 """
-                cursor.execute(query, (history_id, market, cluster, breakfast, room_group, level, year, month))
+                cursor.execute(query, (history_id, market, cluster, breakfast, room_group, level))
                 return cursor.fetchall()
             finally:
                 cursor.close()

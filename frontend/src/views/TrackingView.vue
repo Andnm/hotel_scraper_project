@@ -125,7 +125,7 @@
           <div class="filter-item">
             <label style="visibility: hidden;">Action</label>
             <Button 
-              label="🔍 Tải dữ liệu" 
+              label="Tải dữ liệu" 
               @click="loadTrackingData"
               :loading="loading"
               :disabled="!canLoadData"
@@ -372,7 +372,7 @@ async function loadHistoryList() {
   try {
     const response = await axios.get(`${API_BASE_URL}/api/tracking/history-list`)
     historyOptions.value = response.data.data.map((h: any) => ({
-      label: `#${h.id} - ${h.crawl_date} ${h.crawl_time || ''} (${h.source})`,
+      label: `#${h.id} - ${h.crawl_date} ${h.crawl_time || ''} (${h.scrape_type === 'price' ? 'Cào giá' : 'Cào thông tin'})`,
       value: h.id
     }))
   } catch (error) {
@@ -605,7 +605,6 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
 <style scoped>
 .tracking-view {
   min-height: 400px;

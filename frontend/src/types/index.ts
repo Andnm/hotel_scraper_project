@@ -4,24 +4,25 @@ export interface Hotel {
   hotel_link: string
   price_after_discount?: number
   price_original?: number
+  discount_percent?: string
   review_count?: number
   review_score?: number
   room_type: string
   num_people?: number
   bed_info: string
   room_area: string
+  room_choices?: string
+  popular_facilities?: string
+  check_in?: string
+  check_out?: string
   options: Record<string, any>
 }
 
 export interface CrawlHistory {
   id: number
   crawl_date: string
-  crawl_target?: string
   source: string
   scrape_type: 'info' | 'price'
-  market?: string
-  check_in?: string
-  check_out?: string
   total_records: number
   created_at: string
 }
