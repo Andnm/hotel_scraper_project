@@ -8,9 +8,15 @@
 
 set -e
 
+# Create log directory
+mkdir -p /var/log
+
+# Redirect all output to log file
+exec > >(tee /var/log/init-db.log) 2>&1
+
 echo "=========================================="
 echo "Starting Database Initialization..."
-echo "=========================================="
+echo "========================================="
 
 # Wait for MySQL to be ready
 echo "⏳ Waiting for MySQL to be ready..."

@@ -1,13 +1,15 @@
 # Build Stage
 FROM node:20-alpine as build-stage
 WORKDIR /app
+
+# Copy package files
 COPY package*.json ./
 RUN npm install
+
+# Copy source code and .env file
 COPY . .
-# Nhận biến môi trường lúc build
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
-# Build ra thư mục dist
+
+# Build với .env file (Vite sẽ tự động đọc .env)
 RUN npm run build
 
 # Production Stage
