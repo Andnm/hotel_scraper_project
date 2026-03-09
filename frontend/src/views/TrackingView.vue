@@ -149,7 +149,7 @@
             />
           </div>
           <div class="filters">
-            <div class="filter-item" style="grid-column: span 2;">
+            <div class="filter-item">
               <label>Phiên cào so sánh *</label>
               <Dropdown 
                 v-model="compareFilters.historyId" 
@@ -161,6 +161,96 @@
                 :disabled="loading"
               />
             </div>
+            
+            <div class="filter-item">
+              <label>Năm *</label>
+              <Dropdown 
+                v-model="compareFilters.year" 
+                :options="yearOptions" 
+                placeholder="Chọn năm"
+                class="w-full"
+                :disabled="loading"
+              />
+            </div>
+            
+            <div class="filter-item">
+              <label>Tháng *</label>
+              <Dropdown 
+                v-model="compareFilters.month" 
+                :options="monthOptions" 
+                optionLabel="label" 
+                optionValue="value"
+                placeholder="Chọn tháng"
+                class="w-full"
+                :disabled="loading"
+              />
+            </div>
+            
+            <div class="filter-item">
+              <label>Market *</label>
+              <Dropdown 
+                v-model="compareFilters.market" 
+                :options="marketOptions" 
+                optionLabel="label" 
+                optionValue="value"
+                placeholder="Chọn market"
+                class="w-full"
+                :disabled="loading"
+              />
+            </div>
+            
+            <div class="filter-item">
+              <label>Cluster *</label>
+              <Dropdown 
+                v-model="compareFilters.cluster" 
+                :options="clusterOptions" 
+                optionLabel="label" 
+                optionValue="value"
+                placeholder="Chọn cluster"
+                class="w-full"
+                :disabled="loading"
+              />
+            </div>
+            
+            <div class="filter-item">
+              <label>Giá bao gồm bữa sáng *</label>
+              <Dropdown 
+                v-model="compareFilters.breakfast" 
+                :options="breakfastOptions" 
+                optionLabel="label" 
+                optionValue="value"
+                placeholder="Chọn"
+                class="w-full"
+                :disabled="loading"
+              />
+            </div>
+            
+            <div class="filter-item">
+              <label>Nhóm hạng phòng *</label>
+              <Dropdown 
+                v-model="compareFilters.roomGroup" 
+                :options="roomGroupOptions" 
+                optionLabel="label" 
+                optionValue="value"
+                placeholder="Chọn nhóm"
+                class="w-full"
+                :disabled="loading"
+              />
+            </div>
+            
+            <div class="filter-item">
+              <label>Level *</label>
+              <Dropdown 
+                v-model="compareFilters.level" 
+                :options="levelOptions" 
+                optionLabel="label" 
+                optionValue="value"
+                placeholder="Chọn level"
+                class="w-full"
+                :disabled="loading"
+              />
+            </div>
+            
             <div class="filter-item">
               <label style="visibility: hidden;">Action</label>
               <Button 
@@ -168,7 +258,7 @@
                 icon="pi pi-check" 
                 @click="loadCompareData"
                 :loading="loading"
-                :disabled="!compareFilters.historyId"
+                :disabled="!canLoadCompareData"
                 class="w-full"
                 severity="success"
               />
@@ -178,14 +268,19 @@
       </template>
     </Card>
 
-    <!-- Data Table Card -->
+    <!-- Main Data Table Card -->
     <Card v-if="hasData && !loading" class="data-card mt-4">
       <template #title>
-        <i class="pi pi-table mr-2"></i>Kết quả Tracking
+        <div class="flex align-items-center justify-content-between gap-2">
+          <span><i class="pi pi-table mr-2"></i>{{ hasCompareData ? 'Phiên chính' : 'Kết quả Tracking' }}</span>
+          <div v-if="hasCompareData" class="text-sm text-500">
+            Phiên #{{ filters.historyId }} - {{ filters.market }} {{ filters.cluster }} - {{ filters.year }}/{{ filters.month }}
+          </div>
+        </div>
       </template>
       <template #content>
         <DataTable 
-          :value="tableData" 
+          :value="hasCompareData ? mainTableData : tableData" 
           scrollable 
           scrollHeight="600px"
           :frozenColumns="frozenColumns"
@@ -238,7 +333,94 @@
           
           <!-- Dynamic Date Columns -->
           <Column 
-            v-for="dateCol in dateColumns" 
+            v-for="dateCol in (hasCompareData ? mainDateColumns : dateColumns)" 
+            :key="dateCol.date"
+            :field="dateCol.date"
+            :style="{ minWidth: '120px', maxWidth: '120px' }"
+          >
+            <template #header>
+              <div v-html="dateCol.display" style="text-align: center; line-height: 1.2;"></div>
+            </template>
+            <template #body="slotProps">
+              <div :style="{
+                textAlign: 'right',
+                fontWeight: slotProps.data.isSummaryRow ? '600' : '400',
+                color: slotProps.data.isSummaryRow ? '#1e40af' : '#1e293b'
+              }">
+                {{ formatPrice(slotProps.data[dateCol.date]) }}
+              </div>
+            </template>
+          </Column>
+        </DataTable>
+      </template>
+    </Card>
+
+    <!-- Compare Data Table Card -->
+    <Card v-if="hasCompareData && !loading" class="data-card mt-4">
+      <template #title>
+        <div class="flex align-items-center justify-content-between gap-2">
+          <span><i class="pi pi-table mr-2"></i>Phiên so sánh</span>
+          <div class="text-sm text-500">
+            Phiên #{{ compareFilters.historyId }} - {{ compareFilters.market }} {{ compareFilters.cluster }} - {{ compareFilters.year }}/{{ compareFilters.month }}
+          </div>
+        </div>
+      </template>
+      <template #content>
+        <DataTable 
+          :value="compareTableData" 
+          scrollable 
+          scrollHeight="600px"
+          :frozenColumns="frozenColumns"
+          showGridlines
+          stripedRows
+          class="tracking-table"
+          :rowClass="getRowClass"
+        >
+          <!-- Frozen Columns -->
+          <Column field="Market" header="Market" frozen :style="{ minWidth: '100px' }">
+            <template #body="slotProps">
+              <template v-if="!slotProps.data.isSummaryRow">
+                {{ slotProps.data.Market }}
+              </template>
+            </template>
+          </Column>
+          <Column field="Cluster" header="Cluster" frozen :style="{ minWidth: '120px' }">
+            <template #body="slotProps">
+              <template v-if="!slotProps.data.isSummaryRow">
+                {{ slotProps.data.Cluster }}
+              </template>
+            </template>
+          </Column>
+          <Column field="hotel_name" header="Tên khách sạn" frozen :style="{ minWidth: '200px' }">
+            <template #body="slotProps">
+              {{ slotProps.data.hotel_name }}
+            </template>
+          </Column>
+          <Column field="room_group" header="Nhóm hạng phòng" frozen :style="{ minWidth: '120px' }">
+            <template #body="slotProps">
+              <template v-if="!slotProps.data.isSummaryRow">
+                {{ slotProps.data.room_group }}
+              </template>
+            </template>
+          </Column>
+          <Column field="breakfast" header="Bữa sáng" frozen :style="{ minWidth: '120px' }">
+            <template #body="slotProps">
+              <template v-if="!slotProps.data.isSummaryRow">
+                {{ slotProps.data.breakfast }}
+              </template>
+            </template>
+          </Column>
+          <Column field="level" header="Level" frozen :style="{ minWidth: '100px' }">
+            <template #body="slotProps">
+              <template v-if="!slotProps.data.isSummaryRow">
+                {{ slotProps.data.level }}
+              </template>
+            </template>
+          </Column>
+          
+          <!-- Dynamic Date Columns -->
+          <Column 
+            v-for="dateCol in compareDateColumns" 
             :key="dateCol.date"
             :field="dateCol.date"
             :style="{ minWidth: '120px', maxWidth: '120px' }"
@@ -317,7 +499,14 @@ const filters = ref({
 })
 
 const compareFilters = ref({
-  historyId: null as number | null
+  historyId: null as number | null,
+  year: new Date().getFullYear(),
+  month: new Date().getMonth() + 1,
+  market: null as string | null,
+  cluster: null as string | null,
+  breakfast: null as string | null,
+  roomGroup: null as string | null,
+  level: null as string | null
 })
 
 // Options
@@ -359,6 +548,13 @@ const rawData = ref<Array<any>>([])
 const tableData = ref<Array<any>>([])
 const frozenColumns = ref<Array<any>>([])
 
+// Compare data (separate from main data)
+const mainTableData = ref<Array<any>>([])
+const mainDateColumns = ref<Array<any>>([])
+const compareTableData = ref<Array<any>>([])
+const compareDateColumns = ref<Array<any>>([])
+const hasCompareData = ref(false)
+
 const canLoadData = computed(() => {
   return filters.value.historyId && 
          filters.value.year && 
@@ -368,6 +564,17 @@ const canLoadData = computed(() => {
          filters.value.breakfast && 
          filters.value.roomGroup && 
          filters.value.level
+})
+
+const canLoadCompareData = computed(() => {
+  return compareFilters.value.historyId && 
+         compareFilters.value.year && 
+         compareFilters.value.month && 
+         compareFilters.value.market && 
+         compareFilters.value.cluster && 
+         compareFilters.value.breakfast && 
+         compareFilters.value.roomGroup && 
+         compareFilters.value.level
 })
 
 // Load config options
@@ -451,6 +658,11 @@ async function loadTrackingData() {
     rawData.value = data.main
     
     processTableData()
+    
+    // Store as main table data
+    mainTableData.value = tableData.value
+    mainDateColumns.value = dateColumns.value
+    
     hasData.value = true
     
     toast.add({
@@ -535,7 +747,7 @@ function processTableData() {
 }
 
 // Calculate summary rows (Trung bình, Min, Mid, Max)
-function calculateSummaryRows(data: any[]) {
+function calculateSummaryRows(data: any[], dateColumnsData: any[] = dateColumns.value) {
   const summaryRows = []
   
   // Debug: Check competitor_level values
@@ -583,7 +795,7 @@ function calculateSummaryRows(data: any[]) {
     isSummaryRow: true
   }
   
-  dateColumns.value.forEach(dateCol => {
+  dateColumnsData.forEach(dateCol => {
     // Get all valid prices for this date (for average)
     const allPrices = data
       .map(d => d[dateCol.date])
@@ -606,7 +818,7 @@ function calculateSummaryRows(data: any[]) {
       .filter(p => p != null && p !== undefined && p > 0)
     
     // Debug first date column
-    if (dateCol === dateColumns.value[0]) {
+    if (dateCol === dateColumnsData[0]) {
       console.log(`Date: ${dateCol.date}`)
       console.log('- Min level hotels:', minLevelItems.length, 'with prices:', minLevelPrices)
       console.log('- Mid level hotels:', midLevelItems.length, 'with prices:', midLevelPrices)
@@ -657,17 +869,143 @@ function enableCompareMode() {
 
 function cancelCompare() {
   compareMode.value = false
-  compareFilters.value.historyId = null
+  hasCompareData.value = false
+  compareTableData.value = []
+  compareDateColumns.value = []
+  compareFilters.value = {
+    historyId: null,
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1,
+    market: null,
+    cluster: null,
+    breakfast: null,
+    roomGroup: null,
+    level: null
+  }
 }
 
 async function loadCompareData() {
-  // TODO: Implement compare functionality
-  toast.add({
-    severity: 'info',
-    summary: 'Thông báo',
-    detail: 'Chức năng so sánh đang được phát triển',
-    life: 3000
-  })
+  if (!canLoadCompareData.value) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Cảnh báo',
+      detail: 'Vui lòng chọn đầy đủ các filters cho phiên so sánh',
+      life: 3000
+    })
+    return
+  }
+  
+  // Must have main data first
+  if (!hasData.value) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Cảnh báo',
+      detail: 'Vui lòng tải dữ liệu phiên chính trước',
+      life: 3000
+    })
+    return
+  }
+  
+  loading.value = true
+  try {
+    const response = await axios.post(`${API_BASE_URL}/api/tracking/data`, {
+      // Compare filters only (we load compare data separately)
+      history_id: compareFilters.value.historyId,
+      year: compareFilters.value.year,
+      month: compareFilters.value.month,
+      market: compareFilters.value.market,
+      cluster: compareFilters.value.cluster,
+      breakfast: compareFilters.value.breakfast,
+      room_group: compareFilters.value.roomGroup,
+      level: compareFilters.value.level
+    })
+    
+    const data = response.data.data
+    
+    // Process compare data separately without touching main data
+    compareDateColumns.value = data.date_columns
+    const compareRawData = data.main
+    
+    // Process compare table data
+    const grouped = new Map()
+    
+    compareRawData.forEach(row => {
+      if (!row.Market || !row.Cluster || !row.hotel_name || 
+          !row['Nhóm hạng phòng'] || !row['Giá bao gồm bữa sáng'] || !row.Level) {
+        return
+      }
+      
+      const key = `${row.Market}|${row.Cluster}|${row.hotel_name}|${row['Nhóm hạng phòng']}|${row['Giá bao gồm bữa sáng']}|${row.Level}`
+      
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          Market: row.Market,
+          Cluster: row.Cluster,
+          hotel_name: row.hotel_name,
+          room_group: row['Nhóm hạng phòng'],
+          breakfast: row['Giá bao gồm bữa sáng'],
+          level: row.Level,
+          competitor_level: row['Level đối thủ'],
+          prices: {}
+        })
+      }
+      
+      const hotel = grouped.get(key)
+      const dateKey = row.check_in
+      
+      if (dateKey && row.price_after_discount) {
+        if (!hotel.prices[dateKey]) {
+          hotel.prices[dateKey] = []
+        }
+        hotel.prices[dateKey].push(row.price_after_discount)
+      }
+    })
+    
+    // Calculate average prices
+    const processed = Array.from(grouped.values()).map(hotel => {
+      const result: any = {
+        Market: hotel.Market,
+        Cluster: hotel.Cluster,
+        hotel_name: hotel.hotel_name,
+        room_group: hotel.room_group,
+        breakfast: hotel.breakfast,
+        level: hotel.level,
+        competitor_level: hotel.competitor_level
+      }
+      
+      for (const date in hotel.prices) {
+        const prices = hotel.prices[date]
+        const sum = prices.reduce((a: number, b: number) => a + b, 0)
+        result[date] = sum / prices.length
+      }
+      
+      return result
+    })
+    
+    // Calculate summary rows for compare data
+    const summary = calculateSummaryRows(processed, compareDateColumns.value)
+    compareTableData.value = [...processed, ...summary]
+    
+    hasCompareData.value = true
+    
+    toast.add({
+      severity: 'success',
+      summary: 'Thành công',
+      detail: `Đã tải dữ liệu so sánh: ${processed.length} hotels`,
+      life: 5000
+    })
+    
+  } catch (error: any) {
+    console.error('Load compare data error:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: error.response?.data?.detail || 'Không thể tải dữ liệu so sánh',
+      life: 3000
+    })
+  } finally {
+    loading.value = false
+  }
 }
 
 function formatPrice(price: number | null) {

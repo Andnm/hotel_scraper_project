@@ -19,6 +19,14 @@ class TrackingDataRequest(BaseModel):
     room_group: str
     level: str
     compare_history_id: Optional[int] = None
+    # Compare filters (optional, for comparing with different filters)
+    compare_year: Optional[int] = None
+    compare_month: Optional[int] = None
+    compare_market: Optional[str] = None
+    compare_cluster: Optional[str] = None
+    compare_breakfast: Optional[str] = None
+    compare_room_group: Optional[str] = None
+    compare_level: Optional[str] = None
 
 
 @router.get("/history-list")
@@ -61,15 +69,24 @@ async def get_tracking_data(request: TrackingDataRequest):
         # Get compare data if requested
         compare_data = None
         if request.compare_history_id:
+            # Use compare filters if provided, otherwise use main filters
+            compare_year = request.compare_year if request.compare_year else request.year
+            compare_month = request.compare_month if request.compare_month else request.month
+            compare_market = request.compare_market if request.compare_market else request.market
+            compare_cluster = request.compare_cluster if request.compare_cluster else request.cluster
+            compare_breakfast = request.compare_breakfast if request.compare_breakfast else request.breakfast
+            compare_room_group = request.compare_room_group if request.compare_room_group else request.room_group
+            compare_level = request.compare_level if request.compare_level else request.level
+            
             compare_data = tracking_repo.get_tracking_data(
                 history_id=request.compare_history_id,
-                year=request.year,
-                month=request.month,
-                market=request.market,
-                cluster=request.cluster,
-                breakfast=request.breakfast,
-                room_group=request.room_group,
-                level=request.level
+                year=compare_year,
+                month=compare_month,
+                market=compare_market,
+                cluster=compare_cluster,
+                breakfast=compare_breakfast,
+                room_group=compare_room_group,
+                level=compare_level
             )
         
         # Generate date columns for the month

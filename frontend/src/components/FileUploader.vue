@@ -1,5 +1,27 @@
 <template>
   <div class="file-uploader">
+    <!-- Format Example Info -->
+    <Message severity="info" :closable="false" class="format-info-message">
+      <div class="flex align-items-center justify-content-between w-full">
+        <div class="flex align-items-center gap-3">
+          <i class="pi pi-info-circle" style="font-size: 1.1rem;"></i>
+          <div>
+            <span style="font-size: 0.9rem;">
+              File cần có định dạng: <strong>Cột A = Tên khách sạn</strong>, <strong>Cột B = Link</strong>
+            </span>
+            <Button 
+              label="Xem mẫu" 
+              icon="pi pi-eye" 
+              text
+              size="small"
+              @click="showFormatExample = true"
+              class="ml-2 format-example-btn"
+            />
+          </div>
+        </div>
+      </div>
+    </Message>
+
     <div class="upload-section">
       <div class="two-columns">
         <!-- Excel Upload Section -->
@@ -105,6 +127,90 @@
       <ProgressBar mode="indeterminate" />
       <p style="text-align: center; margin-top: 0.5rem; color: var(--text-color-secondary)">Đang xử lý file...</p>
     </div>
+
+    <!-- Format Example Dialog -->
+    <Dialog 
+      v-model:visible="showFormatExample" 
+      header="Format mẫu cho Excel / Google Sheets"
+      :modal="true"
+      :draggable="false"
+      :style="{ width: '600px' }"
+    >
+      <div class="format-example-content">
+        <p style="color: #64748b; margin-bottom: 1rem;">
+          File Excel hoặc Google Sheets của bạn cần có format như sau:
+        </p>
+
+        <div class="example-table">
+          <table class="format-table">
+            <thead>
+              <tr>
+                <th style="width: 40px; text-align: center; background: #f1f5f9; padding: 0.75rem; border: 1px solid #cbd5e1;">
+                  Cột
+                </th>
+                <th style="width: 200px; background: #f1f5f9; padding: 0.75rem; border: 1px solid #cbd5e1;">
+                  A
+                </th>
+                <th style="background: #f1f5f9; padding: 0.75rem; border: 1px solid #cbd5e1;">
+                  B
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="text-align: center; padding: 0.5rem; border: 1px solid #cbd5e1;">1</td>
+                <td style="padding: 0.5rem; border: 1px solid #cbd5e1;">
+                  Tên khách sạn
+                </td>
+                <td style="padding: 0.5rem; border: 1px solid #cbd5e1;">
+                  Link khách sạn
+                </td>
+              </tr>
+              <tr>
+                <td style="text-align: center; padding: 0.5rem; border: 1px solid #cbd5e1;">2</td>
+                <td style="padding: 0.5rem; border: 1px solid #cbd5e1;">
+                  Green LP Hotel & Apartment
+                </td>
+                <td style="padding: 0.5rem; border: 1px solid #cbd5e1; font-size: 0.85rem; color: #3b82f6;">
+                  https://www.booking.com/hotel/vn/green-lp...
+                </td>
+              </tr>
+              <tr>
+                <td style="text-align: center; padding: 0.5rem; border: 1px solid #cbd5e1;">3</td>
+                <td style="padding: 0.5rem; border: 1px solid #cbd5e1;">
+                  Muong Thanh Vung Tau Hotel
+                </td>
+                <td style="padding: 0.5rem; border: 1px solid #cbd5e1; font-size: 0.85rem; color: #3b82f6;">
+                  https://www.booking.com/hotel/vn/muong-thanh...
+                </td>
+              </tr>
+              <tr>
+                <td style="text-align: center; padding: 0.5rem; border: 1px solid #cbd5e1;">4</td>
+                <td style="padding: 0.5rem; border: 1px solid #cbd5e1;">
+                  Saigon Ninh Chu Hotel
+                </td>
+                <td style="padding: 0.5rem; border: 1px solid #cbd5e1; font-size: 0.85rem; color: #3b82f6;">
+                  https://www.booking.com/hotel/vn/saigon-ninh...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="format-notes" style="margin-top: 1.5rem; padding: 1rem; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
+          <h4 style="margin: 0 0 0.5rem 0; color: #92400e; font-size: 0.95rem;">
+            <i class="pi pi-exclamation-triangle" style="margin-right: 0.5rem;"></i>
+            Lưu ý quan trọng:
+          </h4>
+          <ul style="margin: 0; padding-left: 1.5rem; color: #92400e; font-size: 0.9rem;">
+            <li><strong>Cột A:</strong> Tên khách sạn (text thường)</li>
+            <li><strong>Cột B:</strong> Link từ Booking.com (phải bắt đầu với https://www.booking.com/)</li>
+            <li><strong>Google Sheets:</strong> Có thể có nhiều sheets, mỗi sheet = 1 market</li>
+            <li><strong>Excel:</strong> Mỗi sheet trong file = 1 market khác nhau</li>
+          </ul>
+        </div>
+      </div>
+    </Dialog>
   </div>
 </template>
 
@@ -112,6 +218,8 @@
 import { ref } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import Checkbox from 'primevue/checkbox'
+import Dialog from 'primevue/dialog'
+import Message from 'primevue/message'
 import axios from 'axios'
 import SavedSourcesManager from './SavedSourcesManager.vue'
 
@@ -137,6 +245,9 @@ const uploading = ref(false)
 const googleSheetUrl = ref('')
 const saveSheetForReuse = ref(false)
 const sheetSourceName = ref('')
+
+// Format example dialog
+const showFormatExample = ref(false)
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -398,5 +509,57 @@ function formatFileSize(bytes: number): string {
 :deep(.p-fileupload-choose:hover) {
   background: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%) !important;
   border-color: #1565c0 !important;
+}
+
+.format-info-message {
+  margin-bottom: 1.5rem;
+}
+
+.format-info-message :deep(.p-message-wrapper) {
+  padding: 0.85rem 1rem;
+}
+
+.format-info-message :deep(.p-message-text) {
+  flex: 1;
+  width: 100%;
+}
+
+.format-example-btn {
+  padding: 0.25rem 0.75rem !important;
+  font-size: 0.85rem !important;
+  height: auto !important;
+  min-width: auto !important;
+  color: #3b82f6 !important;
+  font-weight: 500;
+}
+
+.format-example-btn:hover {
+  background: rgba(59, 130, 246, 0.1) !important;
+  color: #2563eb !important;
+}
+
+.format-example-content {
+  padding: 0.5rem 0;
+}
+
+.format-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.format-table th {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.format-table td,
+.format-table th {
+  text-align: left;
+}
+
+.format-notes ul li {
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
 }
 </style>
