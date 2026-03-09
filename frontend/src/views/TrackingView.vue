@@ -750,21 +750,6 @@ function processTableData() {
 function calculateSummaryRows(data: any[], dateColumnsData: any[] = dateColumns.value) {
   const summaryRows = []
   
-  // Debug: Check competitor_level values
-  console.log('=== DEBUG Summary Calculation ===')
-  console.log('Total hotels:', data.length)
-  if (data.length > 0) {
-    console.log('First hotel data keys:', Object.keys(data[0]))
-    console.log('First hotel sample:', data[0])
-    console.log('\nAll hotels with Level đối thủ values:')
-    data.forEach((hotel, idx) => {
-      console.log(`  Hotel ${idx + 1} (${hotel.hotel_name}): Level đối thủ = "${hotel.competitor_level}"`)
-    })
-  }
-  const levels = data.map(d => d.competitor_level).filter(Boolean)
-  console.log('\nNon-null competitor levels found:', levels)
-  console.log('Unique levels:', [...new Set(levels)])
-  
   // For each date column, calculate averages
   // Get common values from first data row (if exists)
   const firstRow = data.length > 0 ? data[0] : {}
@@ -816,14 +801,6 @@ function calculateSummaryRows(data: any[], dateColumnsData: any[] = dateColumns.
     const maxLevelPrices = maxLevelItems
       .map(d => d[dateCol.date])
       .filter(p => p != null && p !== undefined && p > 0)
-    
-    // Debug first date column
-    if (dateCol === dateColumnsData[0]) {
-      console.log(`Date: ${dateCol.date}`)
-      console.log('- Min level hotels:', minLevelItems.length, 'with prices:', minLevelPrices)
-      console.log('- Mid level hotels:', midLevelItems.length, 'with prices:', midLevelPrices)
-      console.log('- Max level hotels:', maxLevelItems.length, 'with prices:', maxLevelPrices)
-    }
     
     // Trung bình thị trường = average of ALL prices (regardless of level)
     if (allPrices.length > 0) {

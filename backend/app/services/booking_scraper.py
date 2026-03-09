@@ -172,8 +172,6 @@ def get_driver(is_headless=True):
             
         except Exception as chrome_error:
             last_error = chrome_error
-            print(f"⚠️ Chrome driver failed: {chrome_error}")
-            print("🔄 Trying Edge as fallback...")
         
         # Fallback to Edge if Chrome fails
         try:
@@ -232,11 +230,9 @@ def get_driver(is_headless=True):
             except Exception as e:
                 pass
             
-            print("✅ Edge driver initialized successfully")
             return driver
             
         except Exception as edge_error:
-            print(f"❌ Edge driver also failed: {edge_error}")
             raise Exception(f"Failed to initialize browser driver. Chrome error: {last_error}. Edge error: {edge_error}")
 
 def is_booking_link(text):
@@ -364,7 +360,6 @@ def get_sheets_from_google_spreadsheet(url):
     try:
         match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', url)
         if not match:
-            print("Cannot extract spreadsheet ID from URL")
             return None
         
         spreadsheet_id = match.group(1)
@@ -372,11 +367,9 @@ def get_sheets_from_google_spreadsheet(url):
         # Method 1: Try to get sheets from HTML page structure
         try:
             html_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
-            print(f"Fetching sheets info from: {html_url}")
             response = requests.get(html_url, timeout=15)
             
             if response.status_code != 200:
-                print(f"Cannot access spreadsheet HTML, status: {response.status_code}")
                 return None
             
             content = response.text
@@ -397,11 +390,9 @@ def get_sheets_from_google_spreadsheet(url):
             for pattern in patterns_to_try:
                 matches = re.findall(pattern, content)
                 if matches:
-                    print(f"Found {len(matches)} potential sheets with pattern: {pattern[:50]}")
                     break
             
             if not matches:
-                print("No sheet patterns matched in HTML")
                 return None
             
             # Keywords to filter out (technical/system fields)
@@ -437,16 +428,10 @@ def get_sheets_from_google_spreadsheet(url):
                     sheets[sheet_name] = gid
                     seen_gids.add(gid)
                     valid_count += 1
-                    print(f"  ✓ Sheet: '{sheet_name}' (gid={gid})")
             
             if sheets:
-                print(f"Successfully found {len(sheets)} valid sheets")
                 return sheets
             else:
-                print(f"Found {len(matches)} matches but none passed validation")
-                # Debug: print some examples
-                for i, (name, gid) in enumerate(matches[:5]):
-                    print(f"  Example {i+1}: '{name}' (gid={gid})")
                 return None
             
         except Exception as e:
@@ -487,22 +472,15 @@ def load_google_sheet(url):
                     api_url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/A:Z?key=AIzaSyDummyKey&majorDimension=ROWS"
                     # Actually, we don't need API key for public sheets, try direct approach
                     api_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/gviz/tq?tqx=out:csv&gid={try_gid}"
-                    print(f"Trying gviz CSV (gid={try_gid}): {api_url}")
                     
                     response = requests.get(api_url, timeout=10)
                     response.raise_for_status()
                     
                     df = pd.read_csv(StringIO(response.text), header=None)
-                    print(f"GVIZ CSV loaded successfully: {len(df)} rows, {len(df.columns)} columns (gid={try_gid})")
                     
                     if len(df) > 0:
-                        print(f"First 3 rows:")
-                        for i in range(min(3, len(df))):
-                            print(f"  Row {i}: {df.iloc[i].tolist()}")
-                        
                         # Parse immediately if we got data
                         if len(df.columns) >= 2:
-                            print(f"GVIZ: Parsing {len(df)} rows for links...")
                             for row_idx in range(len(df)):
                                 hotel_name = str(df.iloc[row_idx, 0]).strip() if pd.notna(df.iloc[row_idx, 0]) else ''
                                 link_value = df.iloc[row_idx, 1]
@@ -522,49 +500,35 @@ def load_google_sheet(url):
                                         })
                             
                             if links_info:
-                                print(f"GVIZ: Found {len(links_info)} links")
                                 return df, links_info, None
                         
                         break  # Success, exit loop
                 except Exception as e:
-                    print(f"GVIZ attempt failed for gid={try_gid}: {e}")
                     continue
                     
         except Exception as e:
-            print(f"GVIZ method error: {e}")
+            pass
         
         # Method 1: Try CSV export (fastest but requires public access)
         try:
             csv_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid}"
-            print(f"Trying CSV export: {csv_url}")
             csv_response = requests.get(csv_url, timeout=10)
             csv_response.raise_for_status()
             df = pd.read_csv(StringIO(csv_response.text), header=None)
-            print(f"CSV loaded successfully: {len(df)} rows, {len(df.columns)} columns")
-            print(f"First 3 rows:")
-            for i in range(min(3, len(df))):
-                print(f"  Row {i}: {df.iloc[i].tolist()}")
         except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 400:
-                print(f"CSV export failed with 400 - Sheet may not be public. Error: {e}")
-            else:
-                print(f"CSV export failed: {e}")
             df = None
         except Exception as e:
-            print(f"CSV export error: {e}")
             df = None
 
         # Method 2: Try HTML export for hyperlinks (works with most sheets)
         if df is None or len(df) == 0:
             try:
                 html_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=html&gid={gid}"
-                print(f"Trying HTML export: {html_url}")
                 html_response = requests.get(html_url, timeout=10)
                 html_response.raise_for_status()
                 
                 soup = BeautifulSoup(html_response.content, 'lxml')
                 rows = soup.find_all('tr')
-                print(f"Found {len(rows)} rows in HTML")
                 
                 for row_idx, tr in enumerate(rows, 1):
                     cells = tr.find_all('td')
@@ -588,25 +552,22 @@ def load_google_sheet(url):
                             })
                 
                 if links_info:
-                    print(f"Found {len(links_info)} links from HTML")
                     return df, links_info, None
                     
             except requests.exceptions.HTTPError as e:
-                print(f"HTML export failed: {e}")
+                pass
             except Exception as e:
-                print(f"HTML parse error: {e}")
+                pass
 
         # Method 3: Try pubhtml (for published sheets)
         if not links_info:
             try:
                 pubhtml_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/pubhtml?gid={gid}"
-                print(f"Trying pubhtml: {pubhtml_url}")
                 html_response = requests.get(pubhtml_url, timeout=10)
                 html_response.raise_for_status()
                 
                 soup = BeautifulSoup(html_response.content, 'lxml')
                 rows = soup.find_all('tr')
-                print(f"Found {len(rows)} rows in pubhtml")
                 
                 for row_idx, tr in enumerate(rows, 1):
                     cells = tr.find_all('td')
@@ -630,27 +591,20 @@ def load_google_sheet(url):
                             })
                 
                 if links_info:
-                    print(f"Found {len(links_info)} links from pubhtml")
                     return df, links_info, None
                     
             except Exception as e:
-                print(f"Pubhtml error: {e}")
+                pass
 
         # Method 4: Fallback to CSV data if we got it
         if df is not None and len(df) > 0 and not links_info:
-            print(f"Fallback to CSV parsing, columns: {len(df.columns)}, rows: {len(df)}")
             if len(df.columns) > 1:
-                print(f"Scanning column B (index 1) for links...")
-                found_count = 0
                 for row_idx in range(len(df)):
                     hotel_name = str(df.iloc[row_idx, 0]).strip() if pd.notna(df.iloc[row_idx, 0]) else ''
                     link_value = df.iloc[row_idx, 1]
                     
-                    print(f"  Row {row_idx + 1}: hotel='{hotel_name}', link_value={repr(link_value)}, type={type(link_value)}")
-                    
                     if pd.notna(link_value):
                         value_str = str(link_value).strip()
-                        print(f"    -> Checking: '{value_str}'")
                         if 'http' in value_str.lower() or 'www.' in value_str.lower():
                             is_valid = is_booking_link(value_str)
                             links_info.append({
@@ -662,15 +616,9 @@ def load_google_sheet(url):
                                 'is_valid': is_valid,
                                 'note': '' if is_valid else '⚠️Link không hợp lệ'
                             })
-                            found_count += 1
-                            print(f"    -> ✓ Added link (valid={is_valid})")
                 
-                print(f"CSV parsing complete: found {found_count} links")
                 if links_info:
-                    print(f"Found {len(links_info)} links from CSV fallback")
                     return df, links_info, None
-            else:
-                print(f"CSV has only {len(df.columns)} column(s), need at least 2")
         
         # All methods failed
         if not links_info:
@@ -681,7 +629,6 @@ def load_google_sheet(url):
                 "2. Định dạng đúng: Cột A = Tên khách sạn, Cột B = Link\n"
                 "3. Có ít nhất 1 link trong cột B"
             )
-            print(error_msg)
             return None, None, error_msg
         
         return df, links_info, None
@@ -700,8 +647,6 @@ def load_google_sheet_all_sheets(url):
     Returns: dict {sheet_name: links_info} or (None, error_message)
     """
     try:
-        print(f"Loading all sheets from Google Sheets: {url}")
-        
         # Extract spreadsheet ID
         match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', url)
         if not match:
@@ -710,42 +655,30 @@ def load_google_sheet_all_sheets(url):
         spreadsheet_id = match.group(1)
         
         # Method: Download entire spreadsheet as XLSX and parse all sheets
-        print("Downloading spreadsheet as XLSX...")
         export_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=xlsx"
         
         try:
             response = requests.get(export_url, timeout=30)
             
             if response.status_code != 200:
-                print(f"Cannot download spreadsheet: Status {response.status_code}")
                 return None, f"Không thể tải spreadsheet (Status {response.status_code}). Vui lòng kiểm tra quyền truy cập."
-            
-            print(f"Downloaded {len(response.content)} bytes")
             
             # Parse Excel file
             from io import BytesIO
             excel_file = BytesIO(response.content)
             xl = pd.ExcelFile(excel_file)
             
-            print(f"Found {len(xl.sheet_names)} sheets: {', '.join(xl.sheet_names)}")
-            
             all_sheets_data = {}
             
             for sheet_name in xl.sheet_names:
-                print(f"\nProcessing sheet '{sheet_name}'...")
-                
                 try:
                     # Read sheet without header
                     df = pd.read_excel(excel_file, sheet_name=sheet_name, header=None)
                     
-                    print(f"  Sheet '{sheet_name}': {len(df)} rows, {len(df.columns)} columns")
-                    
                     if len(df) < 2:  # Need at least header + 1 data row
-                        print(f"  Sheet '{sheet_name}': Too few rows, skipping")
                         continue
                     
                     if len(df.columns) < 2:  # Need at least column A and B
-                        print(f"  Sheet '{sheet_name}': Need at least 2 columns, skipping")
                         continue
                     
                     # Parse links from column B (index 1)
@@ -772,13 +705,9 @@ def load_google_sheet_all_sheets(url):
                                 })
                     
                     if links_info:
-                        print(f"  Found {len(links_info)} links in sheet '{sheet_name}'")
                         all_sheets_data[sheet_name] = links_info
-                    else:
-                        print(f"  No links found in sheet '{sheet_name}'")
                 
                 except Exception as e:
-                    print(f"  Error processing sheet '{sheet_name}': {e}")
                     continue
             
             if all_sheets_data:
@@ -789,15 +718,7 @@ def load_google_sheet_all_sheets(url):
                 return None, "Không tìm thấy link nào trong tất cả các sheets"
         
         except requests.RequestException as e:
-            print(f"Network error: {e}")
             return None, f"Lỗi kết nối: {str(e)}"
-        
-    except Exception as e:
-        error_msg = f"Lỗi khi tải Google Sheets: {str(e)}"
-        print(error_msg)
-        import traceback
-        traceback.print_exc()
-        return None, error_msg
         
     except Exception as e:
         error_msg = f"Lỗi khi tải Google Sheets: {str(e)}"
@@ -903,9 +824,7 @@ def scrape_booking_data(url, debug_mode=False, row_num=None):
                 )
                 break # Success, exit retry loop
             except Exception as e:
-                print(f"Attempt {attempt+1} failed: {str(e)}")
                 if attempt < max_retries - 1:
-                    print("Waiting 5 seconds before retry...")
                     time.sleep(5) # Wait before retry
                 # If last attempt fails, loop will finish and code proceeds below
                 # potentially leading to empty result or further error which is caught by caller

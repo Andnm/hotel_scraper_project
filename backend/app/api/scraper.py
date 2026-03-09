@@ -128,7 +128,7 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
                         'row': row_num
                     }, websocket)
 
-                    #Trigger debug mode nếu muốn tải html để debug
+                    #Trigger debug mode nếu muốn tải html để debug luu vào folder debug_html
                     try:
                         if source == 'booking':
                             data, error_msg = scrape_booking_data(url, debug_mode=False, row_num=row_num)
