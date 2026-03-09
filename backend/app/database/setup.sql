@@ -5,6 +5,11 @@ DROP TABLE IF EXISTS competitor_list;
 DROP TABLE IF EXISTS config_items;
 
 -- Bảng lưu thông tin nguồn data (Excel hoặc Google Sheets)
+
+CREATE DATABASE IF NOT EXISTS hotel_scraper 
+
+USE hotel_scraper;
+
 CREATE TABLE saved_data_sources (
   id            BIGINT AUTO_INCREMENT PRIMARY KEY,
   name          VARCHAR(255) NOT NULL,
