@@ -10,9 +10,9 @@
       <template #content>
         <TabView v-model:activeIndex="activeTab">
           <TabPanel header="Market" :value="0">
-            <DataTable :value="getConfigsByCategory('market')" responsiveLayout="scroll">
-              <Column field="config_key" header="Code" style="width: 30%"></Column>
-              <Column field="config_value" header="Value" style="width: 60%"></Column>
+            <DataTable :value="getConfigsByCategory('market')" responsiveLayout="scroll" showGridlines>
+              <Column field="config_key" header="Mã" style="width: 30%"></Column>
+              <Column field="config_value" header="Giá trị" style="width: 60%"></Column>
               <Column header="Thao tác" style="width: 10%">
                 <template #body="slotProps">
                   <div style="display: flex; gap: 0.75rem; align-items: center;">
@@ -24,9 +24,9 @@
             </DataTable>
           </TabPanel>
           <TabPanel header="Cluster" :value="1">
-            <DataTable :value="getConfigsByCategory('cluster')" responsiveLayout="scroll">
-              <Column field="config_key" header="Code" style="width: 30%"></Column>
-              <Column field="config_value" header="Value" style="width: 60%"></Column>
+            <DataTable :value="getConfigsByCategory('cluster')" responsiveLayout="scroll" showGridlines>
+              <Column field="config_key" header="Mã" style="width: 30%"></Column>
+              <Column field="config_value" header="Giá trị" style="width: 60%"></Column>
               <Column header="Thao tác" style="width: 10%">
                 <template #body="slotProps">
                   <div style="display: flex; gap: 0.75rem; align-items: center;">
@@ -38,9 +38,9 @@
             </DataTable>
           </TabPanel>
           <TabPanel header="Level đối thủ" :value="2">
-            <DataTable :value="getConfigsByCategory('competitor_level')" responsiveLayout="scroll">
-              <Column field="config_key" header="Code" style="width: 30%"></Column>
-              <Column field="config_value" header="Value" style="width: 60%"></Column>
+            <DataTable :value="getConfigsByCategory('competitor_level')" responsiveLayout="scroll" showGridlines>
+              <Column field="config_key" header="Mã" style="width: 30%"></Column>
+              <Column field="config_value" header="Giá trị" style="width: 60%"></Column>
               <Column header="Thao tác" style="width: 10%">
                 <template #body="slotProps">
                   <div style="display: flex; gap: 0.75rem; align-items: center;">
@@ -52,9 +52,9 @@
             </DataTable>
           </TabPanel>
           <TabPanel header="Bữa sáng" :value="3">
-            <DataTable :value="getConfigsByCategory('breakfast')" responsiveLayout="scroll">
-              <Column field="config_key" header="Code" style="width: 30%"></Column>
-              <Column field="config_value" header="Value" style="width: 60%"></Column>
+            <DataTable :value="getConfigsByCategory('breakfast')" responsiveLayout="scroll" showGridlines>
+              <Column field="config_key" header="Mã" style="width: 30%"></Column>
+              <Column field="config_value" header="Giá trị" style="width: 60%"></Column>
               <Column header="Thao tác" style="width: 10%">
                 <template #body="slotProps">
                   <div style="display: flex; gap: 0.75rem; align-items: center;">
@@ -66,9 +66,9 @@
             </DataTable>
           </TabPanel>
           <TabPanel header="Nhóm hạng phòng" :value="4">
-            <DataTable :value="getConfigsByCategory('room_group')" responsiveLayout="scroll">
-              <Column field="config_key" header="Code" style="width: 30%"></Column>
-              <Column field="config_value" header="Value" style="width: 60%"></Column>
+            <DataTable :value="getConfigsByCategory('room_group')" responsiveLayout="scroll" showGridlines>
+              <Column field="config_key" header="Mã" style="width: 30%"></Column>
+              <Column field="config_value" header="Giá trị" style="width: 60%"></Column>
               <Column header="Thao tác" style="width: 10%">
                 <template #body="slotProps">
                   <div style="display: flex; gap: 0.75rem; align-items: center;">
@@ -80,9 +80,9 @@
             </DataTable>
           </TabPanel>
           <TabPanel header="Level" :value="5">
-            <DataTable :value="getConfigsByCategory('level')" responsiveLayout="scroll">
-              <Column field="config_key" header="Code" style="width: 30%"></Column>
-              <Column field="config_value" header="Value" style="width: 60%"></Column>
+            <DataTable :value="getConfigsByCategory('level')" responsiveLayout="scroll" showGridlines>
+              <Column field="config_key" header="Mã" style="width: 30%"></Column>
+              <Column field="config_value" header="Giá trị" style="width: 60%"></Column>
               <Column header="Thao tác" style="width: 10%">
                 <template #body="slotProps">
                   <div style="display: flex; gap: 0.75rem; align-items: center;">
@@ -98,17 +98,17 @@
     </Card>
 
     <!-- Dialog for Config Items -->
-    <Dialog v-model:visible="showDialog" :header="dialogMode === 'create' ? 'Thêm Config' : 'Sửa Config'" :style="{ width: '500px' }" modal>
+    <Dialog v-model:visible="showDialog" :header="dialogMode === 'create' ? 'Thêm Config' : 'Sửa Config'" :style="{ width: '550px' }" modal class="config-dialog">
       <div class="p-fluid">
         <div class="field" v-if="dialogMode === 'create'">
-          <div class="flex align-items-center gap-2 mb-3">
+          <div class="p-3 checkbox-container">
             <Checkbox v-model="bulkAddMode" inputId="bulkMode" binary />
-            <label for="bulkMode" style="cursor: pointer">Thêm nhiều config cùng lúc</label>
+            <label for="bulkMode" class="checkbox-label">Thêm nhiều config cùng lúc</label>
           </div>
         </div>
         
         <div class="field">
-          <label for="category">Loại</label>
+          <label for="category"><i class="pi pi-tag"></i>Loại Config</label>
           <Dropdown 
             v-model="formData.category" 
             :options="categoryOptions" 
@@ -121,27 +121,39 @@
         
         <template v-if="!bulkAddMode">
           <div class="field">
-            <label for="key">Code</label>
-            <InputText v-model="formData.config_key" placeholder="Nhập code (ví dụ: A, 1, 0)" style="width: 100%" />
+            <label for="key"><i class="pi pi-key"></i>Mã (Code)</label>
+            <InputText 
+              v-model="formData.config_key" 
+              placeholder="Ví dụ: A, B, C hoặc 1, 2, 3" 
+              style="width: 100%; font-size: 0.95rem"
+            />
+            <small class="block mt-1" style="color: #64748b">Mã ngắn gọn để phân loại</small>
           </div>
           <div class="field">
-            <label for="value">Value</label>
-            <InputText v-model="formData.config_value" placeholder="Nhập value" style="width: 100%" />
+            <label for="value"><i class="pi pi-align-left"></i>Giá trị (Value)</label>
+            <InputText 
+              v-model="formData.config_value" 
+              placeholder="Nhập mô tả đầy đủ" 
+              style="width: 100%; font-size: 0.95rem"
+            />
+            <small class="block mt-1" style="color: #64748b">Mô tả chi tiết của config</small>
           </div>
         </template>
         
         <template v-else>
           <div class="field">
-            <label for="bulkData">Nhập nhiều config</label>
-            <small class="block mb-2" style="color: var(--text-color-secondary)">
-              Nhập mỗi config trên một dòng theo format: <strong>code,value</strong><br/>
-              Ví dụ: A,Level đối thủ cao
-            </small>
+            <label for="bulkData"><i class="pi pi-list"></i>Nhập nhiều config</label>
+            <div class="p-3 mb-2" style="background: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 6px;">
+              <small style="color: #1e40af; line-height: 1.6;">
+                <strong>Format:</strong> Mỗi dòng một config theo cú pháp: <code style="background: white; padding: 2px 6px; border-radius: 4px; color: #dc2626;">mã,giá_trị</code><br/>
+                <strong>Ví dụ:</strong> A,Level đối thủ cao
+              </small>
+            </div>
             <Textarea 
               v-model="bulkData" 
               rows="10" 
               placeholder="A,Level đối thủ cao&#10;B,Level đối thủ trung bình&#10;C,Level đối thủ thấp"
-              style="font-family: monospace"
+              style="font-family: 'Consolas', 'Monaco', monospace; font-size: 0.9rem; line-height: 1.6;"
             />
           </div>
         </template>
@@ -401,14 +413,66 @@ onMounted(() => {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 600;
-  color: var(--text-color);
+  color: #1e293b;
+  font-size: 0.95rem;
+}
+
+.field label i {
+  color: #3b82f6;
+  margin-right: 0.625rem;
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.checkbox-label {
+  cursor: pointer;
+  font-weight: 500;
+  margin: 0 !important;
+  line-height: 1.5;
+  padding-top: 2px;
 }
 
 .field small {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
 }
 
 .p-fluid .field:last-child {
   margin-bottom: 0;
+}
+
+:deep(.config-dialog .p-dialog-header) {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-bottom: 2px solid #cbd5e1;
+  padding: 1.25rem 1.5rem;
+}
+
+:deep(.config-dialog .p-dialog-content) {
+  padding: 1.5rem;
+  background: #ffffff;
+}
+
+:deep(.config-dialog .p-dialog-footer) {
+  padding: 1rem 1.5rem;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+:deep(.p-inputtext:focus),
+:deep(.p-dropdown:focus),
+:deep(.p-textarea:focus) {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+code {
+  font-family: 'Consolas', 'Monaco', monospace;
 }
 </style>

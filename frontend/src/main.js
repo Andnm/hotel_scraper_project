@@ -9,6 +9,7 @@ import router from './router'
 
 // PrimeVue CSS
 import 'primeicons/primeicons.css'
+import 'primeflex/primeflex.css'
 
 // PrimeVue Components
 import Button from 'primevue/button'

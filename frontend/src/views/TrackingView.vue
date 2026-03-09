@@ -192,14 +192,49 @@
           showGridlines
           stripedRows
           class="tracking-table"
+          :rowClass="getRowClass"
         >
           <!-- Frozen Columns -->
-          <Column field="Market" header="Market" frozen :style="{ minWidth: '100px' }"></Column>
-          <Column field="Cluster" header="Cluster" frozen :style="{ minWidth: '120px' }"></Column>
-          <Column field="hotel_name" header="Tên khách sạn" frozen :style="{ minWidth: '200px' }"></Column>
-          <Column field="room_group" header="Nhóm hạng phòng" frozen :style="{ minWidth: '120px' }"></Column>
-          <Column field="breakfast" header="Bữa sáng" frozen :style="{ minWidth: '120px' }"></Column>
-          <Column field="level" header="Level" frozen :style="{ minWidth: '100px' }"></Column>
+          <Column field="Market" header="Market" frozen :style="{ minWidth: '100px' }">
+            <template #body="slotProps">
+              <template v-if="!slotProps.data.isSummaryRow">
+                {{ slotProps.data.Market }}
+              </template>
+            </template>
+          </Column>
+          <Column field="Cluster" header="Cluster" frozen :style="{ minWidth: '120px' }">
+            <template #body="slotProps">
+              <template v-if="!slotProps.data.isSummaryRow">
+                {{ slotProps.data.Cluster }}
+              </template>
+            </template>
+          </Column>
+          <Column field="hotel_name" header="Tên khách sạn" frozen :style="{ minWidth: '200px' }">
+            <template #body="slotProps">
+              {{ slotProps.data.hotel_name }}
+            </template>
+          </Column>
+          <Column field="room_group" header="Nhóm hạng phòng" frozen :style="{ minWidth: '120px' }">
+            <template #body="slotProps">
+              <template v-if="!slotProps.data.isSummaryRow">
+                {{ slotProps.data.room_group }}
+              </template>
+            </template>
+          </Column>
+          <Column field="breakfast" header="Bữa sáng" frozen :style="{ minWidth: '120px' }">
+            <template #body="slotProps">
+              <template v-if="!slotProps.data.isSummaryRow">
+                {{ slotProps.data.breakfast }}
+              </template>
+            </template>
+          </Column>
+          <Column field="level" header="Level" frozen :style="{ minWidth: '100px' }">
+            <template #body="slotProps">
+              <template v-if="!slotProps.data.isSummaryRow">
+                {{ slotProps.data.level }}
+              </template>
+            </template>
+          </Column>
           
           <!-- Dynamic Date Columns -->
           <Column 
@@ -214,8 +249,8 @@
             <template #body="slotProps">
               <div :style="{
                 textAlign: 'right',
-                fontWeight: slotProps.data.isRowGroup ? '600' : '400',
-                color: slotProps.data.isRowGroup ? '#667eea' : '#1e293b'
+                fontWeight: slotProps.data.isSummaryRow ? '600' : '400',
+                color: slotProps.data.isSummaryRow ? '#1e40af' : '#1e293b'
               }">
                 {{ formatPrice(slotProps.data[dateCol.date]) }}
               </div>
@@ -492,8 +527,9 @@ function processTableData() {
     result.push(rowData)
   })
   
-  // Add summary rows
-  result.push(...calculateSummaryRows(result))
+  // Add summary rows back to main data
+  const summaryRows = calculateSummaryRows(result)
+  result.push(...summaryRows)
   
   tableData.value = result
 }
@@ -502,72 +538,112 @@ function processTableData() {
 function calculateSummaryRows(data: any[]) {
   const summaryRows = []
   
+  // Debug: Check competitor_level values
+  console.log('=== DEBUG Summary Calculation ===')
+  console.log('Total hotels:', data.length)
+  if (data.length > 0) {
+    console.log('First hotel data keys:', Object.keys(data[0]))
+    console.log('First hotel sample:', data[0])
+    console.log('\nAll hotels with Level đối thủ values:')
+    data.forEach((hotel, idx) => {
+      console.log(`  Hotel ${idx + 1} (${hotel.hotel_name}): Level đối thủ = "${hotel.competitor_level}"`)
+    })
+  }
+  const levels = data.map(d => d.competitor_level).filter(Boolean)
+  console.log('\nNon-null competitor levels found:', levels)
+  console.log('Unique levels:', [...new Set(levels)])
+  
   // For each date column, calculate averages
+  // Get common values from first data row (if exists)
+  const firstRow = data.length > 0 ? data[0] : {}
+  
   const avgRow: any = {
-    Market: '',
-    Cluster: '',
+    Market: firstRow.Market || '',
+    Cluster: firstRow.Cluster || '',
     hotel_name: 'Trung bình thị trường',
-    room_group: '',
-    breakfast: '',
-    level: '',
-    competitor_level: ''
+    room_group: firstRow.room_group || '',
+    breakfast: firstRow.breakfast || '',
+    level: firstRow.level || '',
+    isSummaryRow: true,
+    isFirstSummary: true
   }
   
   const minRow: any = {
-    Market: '',
-    Cluster: '',
     hotel_name: 'Min',
-    room_group: '',
-    breakfast: '',
-    level: '',
-    competitor_level: ''
+    isSummaryRow: true
   }
   
   const midRow: any = {
-    Market: '',
-    Cluster: '',
     hotel_name: 'Mid',
-    room_group: '',
-    breakfast: '',
-    level: '',
-    competitor_level: ''
+    isSummaryRow: true
   }
   
   const maxRow: any = {
-    Market: '',
-    Cluster: '',
     hotel_name: 'Max',
-    room_group: '',
-    breakfast: '',
-    level: '',
-    competitor_level: ''
+    isSummaryRow: true
   }
   
   dateColumns.value.forEach(dateCol => {
-    // Only include prices that exist (not null/undefined) in calculations
+    // Get all valid prices for this date (for average)
     const allPrices = data
       .map(d => d[dateCol.date])
       .filter(p => p != null && p !== undefined && p > 0)
     
-    const minPrices = data
-      .filter(d => d.competitor_level === 'Min')
+    // Get prices by competitor_level (1=Min, 2=Mid, 3=Max) - stored as strings
+    const minLevelItems = data.filter(d => d.competitor_level === '1')
+    const minLevelPrices = minLevelItems
       .map(d => d[dateCol.date])
       .filter(p => p != null && p !== undefined && p > 0)
     
-    const midPrices = data
-      .filter(d => d.competitor_level === 'Mid')
+    const midLevelItems = data.filter(d => d.competitor_level === '2')
+    const midLevelPrices = midLevelItems
       .map(d => d[dateCol.date])
       .filter(p => p != null && p !== undefined && p > 0)
     
-    const maxPrices = data
-      .filter(d => d.competitor_level === 'Max')
+    const maxLevelItems = data.filter(d => d.competitor_level === '3')
+    const maxLevelPrices = maxLevelItems
       .map(d => d[dateCol.date])
       .filter(p => p != null && p !== undefined && p > 0)
     
-    avgRow[dateCol.date] = allPrices.length > 0 ? allPrices.reduce((a, b) => a + b, 0) / allPrices.length : null
-    minRow[dateCol.date] = minPrices.length > 0 ? minPrices.reduce((a, b) => a + b, 0) / minPrices.length : null
-    midRow[dateCol.date] = midPrices.length > 0 ? midPrices.reduce((a, b) => a + b, 0) / midPrices.length : null
-    maxRow[dateCol.date] = maxPrices.length > 0 ? maxPrices.reduce((a, b) => a + b, 0) / maxPrices.length : null
+    // Debug first date column
+    if (dateCol === dateColumns.value[0]) {
+      console.log(`Date: ${dateCol.date}`)
+      console.log('- Min level hotels:', minLevelItems.length, 'with prices:', minLevelPrices)
+      console.log('- Mid level hotels:', midLevelItems.length, 'with prices:', midLevelPrices)
+      console.log('- Max level hotels:', maxLevelItems.length, 'with prices:', maxLevelPrices)
+    }
+    
+    // Trung bình thị trường = average of ALL prices (regardless of level)
+    if (allPrices.length > 0) {
+      const sum = allPrices.reduce((a, b) => a + b, 0)
+      avgRow[dateCol.date] = sum / allPrices.length
+    } else {
+      avgRow[dateCol.date] = null
+    }
+    
+    // Min = average of prices from hotels with competitor_level = 'Min'
+    if (minLevelPrices.length > 0) {
+      const sum = minLevelPrices.reduce((a, b) => a + b, 0)
+      minRow[dateCol.date] = sum / minLevelPrices.length
+    } else {
+      minRow[dateCol.date] = null
+    }
+    
+    // Mid = average of prices from hotels with competitor_level = 'Mid'
+    if (midLevelPrices.length > 0) {
+      const sum = midLevelPrices.reduce((a, b) => a + b, 0)
+      midRow[dateCol.date] = sum / midLevelPrices.length
+    } else {
+      midRow[dateCol.date] = null
+    }
+    
+    // Max = average of prices from hotels with competitor_level = 'Max'
+    if (maxLevelPrices.length > 0) {
+      const sum = maxLevelPrices.reduce((a, b) => a + b, 0)
+      maxRow[dateCol.date] = sum / maxLevelPrices.length
+    } else {
+      maxRow[dateCol.date] = null
+    }
   })
   
   summaryRows.push(avgRow, minRow, midRow, maxRow)
@@ -597,6 +673,10 @@ async function loadCompareData() {
 function formatPrice(price: number | null) {
   if (!price && price !== 0) return '-'
   return new Intl.NumberFormat('vi-VN').format(Math.round(price))
+}
+
+function getRowClass(data: any) {
+  return data.isSummaryRow ? 'summary-row' : ''
 }
 
 onMounted(async () => {
@@ -684,18 +764,19 @@ onMounted(async () => {
 }
 
 :deep(.tracking-table .p-datatable-thead > tr > th) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white !important;
+  background: #f1f5f9;
+  color: #334155 !important;
   font-weight: 600;
   font-size: 0.875rem;
   padding: 0.75rem;
-  border: 1px solid #5568d3;
+  border: 1px solid #cbd5e1;
 }
 
 :deep(.tracking-table .p-datatable-tbody > tr > td) {
   padding: 0.75rem;
   border: 1px solid #e2e8f0;
   font-size: 0.875rem;
+  background: white;
 }
 
 :deep(.tracking-table .p-datatable-tbody > tr:hover) {
@@ -723,13 +804,37 @@ onMounted(async () => {
   }
 }
 
-/* Highlight summary rows */
-:deep(.tracking-table .p-datatable-tbody > tr:nth-last-child(-n+4)) {
-  background: #fef3c7 !important;
+/* Summary Row Styles */
+:deep(.tracking-table .summary-row) {
+  background: #93c5fd !important;
   font-weight: 600;
 }
 
-:deep(.tracking-table .p-datatable-tbody > tr:nth-last-child(-n+4):hover) {
-  background: #fde68a !important;
+:deep(.tracking-table .summary-row:hover) {
+  background: #60a5fa !important;
+}
+
+:deep(.tracking-table .summary-row td) {
+  background: #93c5fd !important;
+  border-color: #60a5fa !important;
+  color: #1e40af !important;
+}
+
+/* Merge 6 frozen columns in summary rows - remove internal borders */
+:deep(.tracking-table .summary-row td:nth-child(1)),
+:deep(.tracking-table .summary-row td:nth-child(2)),
+:deep(.tracking-table .summary-row td:nth-child(3)),
+:deep(.tracking-table .summary-row td:nth-child(4)),
+:deep(.tracking-table .summary-row td:nth-child(5)),
+:deep(.tracking-table .summary-row td:nth-child(6)) {
+  border-right: none !important;
+}
+
+:deep(.tracking-table .summary-row td:nth-child(2)),
+:deep(.tracking-table .summary-row td:nth-child(3)),
+:deep(.tracking-table .summary-row td:nth-child(4)),
+:deep(.tracking-table .summary-row td:nth-child(5)),
+:deep(.tracking-table .summary-row td:nth-child(6)) {
+  border-left: none !important;
 }
 </style>

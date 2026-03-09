@@ -317,9 +317,8 @@ class CrawlDataRepository:
                     SELECT 
                         cd.*,
                         ch.crawl_date,
-                        ch.crawl_target,
-                        ch.check_in,
-                        ch.check_out,
+                        ch.crawl_time,
+                        ch.source,
                         ch.scrape_type,
                         cl.market AS Market,
                         cl.cluster AS Cluster,
@@ -360,7 +359,9 @@ class CrawlDataRepository:
                     SELECT 
                         cd.*,
                         ch.crawl_date,
-                        ch.crawl_target,
+                        ch.crawl_time,
+                        ch.source,
+                        ch.scrape_type,
                         cl.market AS Market,
                         cl.cluster AS Cluster,
                         cl.competitor_level AS `Level đối thủ`,
@@ -404,7 +405,9 @@ class CrawlDataRepository:
                     SELECT 
                         cd.*,
                         ch.crawl_date,
-                        ch.crawl_target,
+                        ch.crawl_time,
+                        ch.source,
+                        ch.scrape_type,
                         cl.market AS Market,
                         cl.cluster AS Cluster,
                         cl.competitor_level AS `Level đối thủ`,
@@ -901,6 +904,8 @@ class TrackingRepository:
                         cd.hotel_name,
                         cd.room_type,
                         cd.price_after_discount,
+                        cd.check_in,
+                        cd.check_out,
                         cl.market AS Market,
                         cl.cluster AS Cluster,
                         cl.breakfast_included AS 'Giá bao gồm bữa sáng',
@@ -908,7 +913,7 @@ class TrackingRepository:
                         cl.level AS Level,
                         cl.competitor_level AS 'Level đối thủ'
                     FROM crawl_data cd
-                    LEFT JOIN competitor_list cl ON 
+                    INNER JOIN competitor_list cl ON 
                         TRIM(cd.hotel_name) = TRIM(cl.hotel_name)
                         AND (cl.room_type IS NULL OR cl.room_type = '' OR TRIM(cd.room_type) = TRIM(cl.room_type))
                     WHERE cd.history_id = %s
@@ -919,8 +924,20 @@ class TrackingRepository:
                         AND cl.level = %s
                     ORDER BY cd.hotel_name, cd.room_type
                 """
+                print(f"\n=== DEBUG Tracking Query ===")
+                print(f"Parameters: history_id={history_id}, market={market}, cluster={cluster}")
+                print(f"            breakfast={breakfast}, room_group={room_group}, level={level}")
+                
                 cursor.execute(query, (history_id, market, cluster, breakfast, room_group, level))
-                return cursor.fetchall()
+                results = cursor.fetchall()
+                
+                print(f"Query returned {len(results)} rows")
+                if results:
+                    print(f"Sample row: {results[0]}")
+                    levels = [r.get('Level đối thủ') for r in results]
+                    print(f"Competitor levels in results: {set(levels)}")
+                
+                return results
             finally:
                 cursor.close()
     

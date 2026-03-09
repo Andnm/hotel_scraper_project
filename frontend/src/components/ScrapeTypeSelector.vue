@@ -9,9 +9,9 @@
         @click="selectMode('info')"
       >
         <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem">
-          <i class="pi pi-info-circle" style="font-size: 1.25rem; color: var(--blue-500)"></i>
+          <i class="pi pi-info-circle" style="font-size: 1.25rem; color: #3b82f6"></i>
           <strong style="flex: 1">Cào thông tin</strong>
-          <i v-if="modelValue === 'info'" class="pi pi-check-circle" style="color: var(--green-500)"></i>
+          <i v-if="modelValue === 'info'" class="pi pi-check-circle" style="color: #16a34a; font-size: 1.25rem"></i>
         </div>
         <p class="mode-description">
           Lấy đầy đủ thông tin chi tiết về khách sạn và phòng
@@ -25,9 +25,9 @@
         @click="selectMode('price')"
       >
         <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem">
-          <i class="pi pi-dollar" style="font-size: 1.25rem; color: var(--green-500)"></i>
+          <i class="pi pi-dollar" style="font-size: 1.25rem; color: #16a34a"></i>
           <strong style="flex: 1">Cào giá</strong>
-          <i v-if="modelValue === 'price'" class="pi pi-check-circle" style="color: var(--green-500)"></i>
+          <i v-if="modelValue === 'price'" class="pi pi-check-circle" style="color: #16a34a; font-size: 1.25rem"></i>
         </div>
         <p class="mode-description">
           Chỉ lấy thông tin về giá và khuyến mãi
@@ -62,29 +62,47 @@ function selectMode(mode: 'info' | 'price') {
 .mode-card {
   flex: 1;
   padding: 1rem;
-  border: 2px solid var(--surface-200);
-  background: var(--surface-50);
+  border: 2px solid #e2e8f0;
+  background: #ffffff;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.25s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .mode-card:hover {
-  border-color: var(--primary-color);
-  background: var(--surface-100);
+  border-color: #94a3b8;
+  background: #f8fafc;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .mode-selected {
-  border-color: var(--primary-color);
-  background: var(--primary-50);
-  box-shadow: 0 0 0 3px rgba(30, 136, 229, 0.15);
+  border-color: #3b82f6;
+  border-width: 3px;
+  background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3), 0 0 0 4px rgba(59, 130, 246, 0.1);
+  transform: translateY(-1px);
+}
+
+.mode-selected strong {
+  color: #1e40af;
+  font-weight: 700;
+}
+
+.mode-selected .mode-description {
+  color: #475569;
+  font-weight: 500;
+}
+
+.mode-card:not(.mode-selected) strong {
+  color: #64748b;
+  font-weight: 600;
 }
 
 .mode-description {
   font-size: 0.875rem;
-  color: var(--text-color-secondary);
+  color: #94a3b8;
   margin: 0 0 0.5rem 0;
   line-height: 1.4;
 }

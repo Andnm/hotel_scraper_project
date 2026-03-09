@@ -43,16 +43,6 @@
               <span class="info-label">NGÀY CÀO</span>
               <span class="info-value">{{ formatDate(historyStore.currentHistory.crawl_date) }}</span>
             </div>
-            <div class="info-divider" v-if="historyStore.currentHistory.check_in"></div>
-            <div class="info-item" v-if="historyStore.currentHistory.check_in">
-              <span class="info-label">CHECK-IN</span>
-              <span class="info-value" style="color: #10b981">{{ formatDate(historyStore.currentHistory.check_in) }}</span>
-            </div>
-            <div class="info-divider" v-if="historyStore.currentHistory.check_out"></div>
-            <div class="info-item" v-if="historyStore.currentHistory.check_out">
-              <span class="info-label">CHECK-OUT</span>
-              <span class="info-value" style="color: #ef4444">{{ formatDate(historyStore.currentHistory.check_out) }}</span>
-            </div>
           </div>
 
           <!-- Data Table -->
@@ -62,45 +52,115 @@
             
             <!-- Info Mode Columns -->
             <template v-if="historyStore.currentHistory?.scrape_type === 'info'">
-              <Column field="hotel_name" header="Khách sạn" :style="{ minWidth: '200px' }"></Column>
-              <Column field="room_type" header="Loại phòng" :style="{ minWidth: '200px' }"></Column>
-              <Column field="num_people" header="Số người" :style="{ width: '90px' }"></Column>
-              <Column field="bed_info" header="Giường" :style="{ minWidth: '150px' }"></Column>
-              <Column field="room_area" header="Diện tích" :style="{ width: '100px' }"></Column>
-              <Column field="room_choices" header="Các lựa chọn" :style="{ minWidth: '250px' }">
+              <Column field="crawl_date" header="Ngày cào" :style="{ width: '110px' }">
                 <template #body="slotProps">
-                  <div class="text-ellipsis"
-                    v-tooltip.top="slotProps.data.options?.facilities || slotProps.data.room_choices"
-                    style="cursor: help;">
-                    {{ slotProps.data.options?.facilities || slotProps.data.room_choices }}
+                  {{ formatDate(slotProps.data.crawl_date) }}
+                </template>
+              </Column>
+              <Column field="crawl_time" header="Giờ cào" :style="{ width: '90px' }"></Column>
+              <Column field="check_in" header="Check in" :style="{ width: '110px' }">
+                <template #body="slotProps">
+                  {{ formatDate(slotProps.data.check_in) }}
+                </template>
+              </Column>
+              <Column field="check_out" header="Check out" :style="{ width: '110px' }">
+                <template #body="slotProps">
+                  {{ formatDate(slotProps.data.check_out) }}
+                </template>
+              </Column>
+              <Column field="hotel_name" header="Tên khách sạn" :style="{ minWidth: '200px' }" frozen></Column>
+              <Column field="hotel_link" header="Link" :style="{ width: '80px' }">
+                <template #body="slotProps">
+                  <a :href="slotProps.data.hotel_link" target="_blank" v-if="slotProps.data.hotel_link">
+                    <Button icon="pi pi-external-link" text size="small" />
+                  </a>
+                </template>
+              </Column>
+              <Column field="review_count" header="Số review" :style="{ width: '110px' }"></Column>
+              <Column field="review_score" header="Điểm review" :style="{ width: '110px' }"></Column>
+              <Column field="popular_facilities" header="Tiện nghi" :style="{ minWidth: '250px' }">
+                <template #body="slotProps">
+                  <div class="text-ellipsis" v-tooltip.top="slotProps.data.popular_facilities" style="cursor: help;">
+                    {{ slotProps.data.popular_facilities }}
                   </div>
                 </template>
               </Column>
-              <Column field="Market" header="Market" :style="{ width: '100px' }"></Column>
-              <Column field="Cluster" header="Cluster" :style="{ width: '120px' }"></Column>
-              <Column field="Level_doi_thu" header="Level ĐT" :style="{ width: '100px' }">
+              <Column field="room_type" header="Tên hạng phòng" :style="{ minWidth: '200px' }"></Column>
+              <Column field="num_people" header="Số người" :style="{ width: '100px' }"></Column>
+              <Column field="bed_info" header="Giường" :style="{ minWidth: '150px' }"></Column>
+              <Column field="room_area" header="Diện tích" :style="{ width: '110px' }"></Column>
+              <Column field="room_choices" header="Các lựa chọn" :style="{ minWidth: '250px' }">
                 <template #body="slotProps">
-                  {{ slotProps.data['Level đối thủ'] }}
+                  <div class="text-ellipsis" v-tooltip.top="slotProps.data.room_choices" style="cursor: help;">
+                    {{ slotProps.data.room_choices }}
+                  </div>
                 </template>
               </Column>
-              <Column field="Gia_bao_gom_bua_sang" header="Bữa sáng" :style="{ width: '100px' }">
+              <Column field="Market" header="Market" :style="{ width: '100px' }">
                 <template #body="slotProps">
-                  {{ slotProps.data['Giá bao gồm bữa sáng'] }}
+                  <span v-if="slotProps.data.Market" v-tooltip.top="getConfigLabel(marketOptions, slotProps.data.Market)" style="cursor: help; border-bottom: 1px dotted #999;">
+                    {{ slotProps.data.Market }}
+                  </span>
                 </template>
               </Column>
-              <Column field="Nhom_hang_phong" header="Nhóm HP" :style="{ width: '100px' }">
+              <Column field="Cluster" header="Cluster" :style="{ width: '120px' }">
                 <template #body="slotProps">
-                  {{ slotProps.data['Nhóm hạng phòng'] }}
+                  <span v-if="slotProps.data.Cluster" v-tooltip.top="getConfigLabel(clusterOptions, slotProps.data.Cluster)" style="cursor: help; border-bottom: 1px dotted #999;">
+                    {{ slotProps.data.Cluster }}
+                  </span>
                 </template>
               </Column>
-              <Column field="Level" header="Level" :style="{ width: '100px' }"></Column>
+              <Column field="Level_doi_thu" header="Level đối thủ" :style="{ width: '120px' }">
+                <template #body="slotProps">
+                  <span v-if="slotProps.data['Level đối thủ']" v-tooltip.top="getConfigLabel(competitorLevelOptions, slotProps.data['Level đối thủ'])" style="cursor: help; border-bottom: 1px dotted #999;">
+                    {{ slotProps.data['Level đối thủ'] }}
+                  </span>
+                </template>
+              </Column>
+              <Column field="Gia_bao_gom_bua_sang" header="Bữa sáng" :style="{ width: '110px' }">
+                <template #body="slotProps">
+                  <span v-if="slotProps.data['Giá bao gồm bữa sáng']" v-tooltip.top="getConfigLabel(breakfastOptions, slotProps.data['Giá bao gồm bữa sáng'])" style="cursor: help; border-bottom: 1px dotted #999;">
+                    {{ slotProps.data['Giá bao gồm bữa sáng'] }}
+                  </span>
+                </template>
+              </Column>
+              <Column field="Nhom_hang_phong" header="Nhóm hạng phòng" :style="{ width: '150px' }">
+                <template #body="slotProps">
+                  <span v-if="slotProps.data['Nhóm hạng phòng']" v-tooltip.top="getConfigLabel(roomGroupOptions, slotProps.data['Nhóm hạng phòng'])" style="cursor: help; border-bottom: 1px dotted #999;">
+                    {{ slotProps.data['Nhóm hạng phòng'] }}
+                  </span>
+                </template>
+              </Column>
+              <Column field="Level" header="Level" :style="{ width: '100px' }">
+                <template #body="slotProps">
+                  <span v-if="slotProps.data.Level" v-tooltip.top="getConfigLabel(levelOptions, slotProps.data.Level)" style="cursor: help; border-bottom: 1px dotted #999;">
+                    {{ slotProps.data.Level }}
+                  </span>
+                </template>
+              </Column>
             </template>
 
             <!-- Price Mode Columns -->
             <template v-else>
-              <Column field="hotel_name" header="Khách sạn" :style="{ minWidth: '200px' }"></Column>
-              <Column field="room_type" header="Loại phòng" :style="{ minWidth: '200px' }"></Column>
-              <Column field="num_people" header="Số người" :style="{ width: '90px' }"></Column>
+              <Column field="crawl_date" header="Ngày cào" :style="{ width: '110px' }">
+                <template #body="slotProps">
+                  {{ formatDate(slotProps.data.crawl_date) }}
+                </template>
+              </Column>
+              <Column field="crawl_time" header="Giờ cào" :style="{ width: '90px' }"></Column>
+              <Column field="check_in" header="Check in" :style="{ width: '110px' }">
+                <template #body="slotProps">
+                  {{ formatDate(slotProps.data.check_in) }}
+                </template>
+              </Column>
+              <Column field="check_out" header="Check out" :style="{ width: '110px' }">
+                <template #body="slotProps">
+                  {{ formatDate(slotProps.data.check_out) }}
+                </template>
+              </Column>
+              <Column field="hotel_name" header="Tên khách sạn" :style="{ minWidth: '200px' }" frozen></Column>
+              <Column field="room_type" header="Tên hạng phòng" :style="{ minWidth: '200px' }"></Column>
+              <Column field="num_people" header="Số người" :style="{ width: '100px' }"></Column>
               <Column field="price_after_discount" header="Giá sau giảm" :style="{ width: '140px' }">
                 <template #body="slotProps">
                   {{ formatPrice(slotProps.data.price_after_discount) }}
@@ -118,29 +178,46 @@
                   </Tag>
                 </template>
               </Column>
-              <Column field="Market" header="Market" :style="{ width: '100px' }"></Column>
-              <Column field="Cluster" header="Cluster" :style="{ width: '120px' }"></Column>
-              <Column field="Level_doi_thu" header="Level ĐT" :style="{ width: '100px' }">
+              <Column field="Market" header="Market" :style="{ width: '100px' }">
                 <template #body="slotProps">
-                  {{ slotProps.data['Level đối thủ'] }}
+                  <span v-if="slotProps.data.Market" v-tooltip.top="getConfigLabel(marketOptions, slotProps.data.Market)" style="cursor: help; border-bottom: 1px dotted #999;">
+                    {{ slotProps.data.Market }}
+                  </span>
                 </template>
               </Column>
-              <Column field="Gia_bao_gom_bua_sang" header="Bữa sáng" :style="{ width: '100px' }">
+              <Column field="Cluster" header="Cluster" :style="{ width: '120px' }">
                 <template #body="slotProps">
-                  {{ slotProps.data['Giá bao gồm bữa sáng'] }}
+                  <span v-if="slotProps.data.Cluster" v-tooltip.top="getConfigLabel(clusterOptions, slotProps.data.Cluster)" style="cursor: help; border-bottom: 1px dotted #999;">
+                    {{ slotProps.data.Cluster }}
+                  </span>
                 </template>
               </Column>
-              <Column field="Nhom_hang_phong" header="Nhóm HP" :style="{ width: '100px' }">
+              <Column field="Level_doi_thu" header="Level đối thủ" :style="{ width: '120px' }">
                 <template #body="slotProps">
-                  {{ slotProps.data['Nhóm hạng phòng'] }}
+                  <span v-if="slotProps.data['Level đối thủ']" v-tooltip.top="getConfigLabel(competitorLevelOptions, slotProps.data['Level đối thủ'])" style="cursor: help; border-bottom: 1px dotted #999;">
+                    {{ slotProps.data['Level đối thủ'] }}
+                  </span>
                 </template>
               </Column>
-              <Column field="Level" header="Level" :style="{ width: '100px' }"></Column>
-              <Column field="hotel_link" header="Link" :style="{ width: '80px' }">
+              <Column field="Gia_bao_gom_bua_sang" header="Bữa sáng" :style="{ width: '110px' }">
                 <template #body="slotProps">
-                  <a :href="slotProps.data.hotel_link" target="_blank" v-if="slotProps.data.hotel_link">
-                    <Button icon="pi pi-external-link" text size="small" />
-                  </a>
+                  <span v-if="slotProps.data['Giá bao gồm bữa sáng']" v-tooltip.top="getConfigLabel(breakfastOptions, slotProps.data['Giá bao gồm bữa sáng'])" style="cursor: help; border-bottom: 1px dotted #999;">
+                    {{ slotProps.data['Giá bao gồm bữa sáng'] }}
+                  </span>
+                </template>
+              </Column>
+              <Column field="Nhom_hang_phong" header="Nhóm hạng phòng" :style="{ width: '150px' }">
+                <template #body="slotProps">
+                  <span v-if="slotProps.data['Nhóm hạng phòng']" v-tooltip.top="getConfigLabel(roomGroupOptions, slotProps.data['Nhóm hạng phòng'])" style="cursor: help; border-bottom: 1px dotted #999;">
+                    {{ slotProps.data['Nhóm hạng phòng'] }}
+                  </span>
+                </template>
+              </Column>
+              <Column field="Level" header="Level" :style="{ width: '100px' }">
+                <template #body="slotProps">
+                  <span v-if="slotProps.data.Level" v-tooltip.top="getConfigLabel(levelOptions, slotProps.data.Level)" style="cursor: help; border-bottom: 1px dotted #999;">
+                    {{ slotProps.data.Level }}
+                  </span>
                 </template>
               </Column>
             </template>
@@ -165,6 +242,7 @@ import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import Toast from 'primevue/toast'
 import * as XLSX from 'xlsx'
+import axios from 'axios'
 
 const router = useRouter()
 const route = useRoute()
@@ -174,6 +252,14 @@ const loading = ref(false)
 const loadingData = ref(false)
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+// Config options for tooltips
+const marketOptions = ref<Array<{ label: string, value: string }>>([])
+const clusterOptions = ref<Array<{ label: string, value: string }>>([])
+const competitorLevelOptions = ref<Array<{ label: string, value: string }>>([])
+const breakfastOptions = ref<Array<{ label: string, value: string }>>([])
+const roomGroupOptions = ref<Array<{ label: string, value: string }>>([])
+const levelOptions = ref<Array<{ label: string, value: string }>>([])
 
 function getSourceSeverity(source: string) {
   if (source === 'agoda') return 'info'
@@ -190,6 +276,28 @@ function formatDate(dateStr: string) {
 function formatPrice(price: number | null | undefined) {
   if (!price && price !== 0) return '-'
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price)
+}
+
+function getConfigLabel(options: Array<{ label: string, value: string }>, code: string | undefined): string {
+  if (!code) return ''
+  const option = options.find(o => o.value === code)
+  return option ? option.label : code
+}
+
+async function loadConfigOptions() {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/config`)
+    const configs = response.data
+    
+    marketOptions.value = (configs.market || []).map((c: any) => ({ label: c.config_value, value: c.config_key }))
+    clusterOptions.value = (configs.cluster || []).map((c: any) => ({ label: c.config_value, value: c.config_key }))
+    competitorLevelOptions.value = (configs.competitor_level || []).map((c: any) => ({ label: c.config_value, value: c.config_key }))
+    breakfastOptions.value = (configs.breakfast || []).map((c: any) => ({ label: c.config_value, value: c.config_key }))
+    roomGroupOptions.value = (configs.room_group || []).map((c: any) => ({ label: c.config_value, value: c.config_key }))
+    levelOptions.value = (configs.level || []).map((c: any) => ({ label: c.config_value, value: c.config_key }))
+  } catch (error) {
+    console.error('Failed to load config options:', error)
+  }
 }
 
 async function loadHistoryDetail() {
@@ -271,7 +379,10 @@ function copyApiLink() {
 }
 
 onMounted(async () => {
-  await loadHistoryDetail()
+  await Promise.all([
+    loadConfigOptions(),
+    loadHistoryDetail()
+  ])
 })
 </script>
 

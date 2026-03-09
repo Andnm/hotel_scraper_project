@@ -81,27 +81,13 @@ async def websocket_scrape_endpoint(websocket: WebSocket):
             results = []
             errors = []
             
-            crawl_target = " | ".join([
-                f"{dr['checkin']} - {dr['checkout']}"
-                for dr in date_ranges
-            ])
-            
             history_repo = CrawlHistoryRepository()
             data_repo = CrawlDataRepository()
             
-            # Lấy check_in và check_out từ date_ranges đầu tiên
-            first_date_range = date_ranges[0] if date_ranges else {}
-            check_in_date = first_date_range.get('checkin')
-            check_out_date = first_date_range.get('checkout')
-            
             history_id = history_repo.create_history(
                 crawl_date=datetime.now().date(),
-                crawl_target=crawl_target,
                 source=source,
-                scrape_type=scrape_type,
-                market=market,
-                check_in=check_in_date,
-                check_out=check_out_date
+                scrape_type=scrape_type
             )
             
             await manager.send_personal_message({

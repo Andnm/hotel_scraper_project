@@ -21,12 +21,6 @@
           </div>
 
           <div class="filter-item">
-            <label>Market</label>
-            <InputText v-model="filters.market" placeholder="Nhập market (ví dụ: VN, US)" class="w-full"
-              @keyup.enter="loadHistories" />
-          </div>
-
-          <div class="filter-item">
             <label>Từ ngày</label>
             <Calendar v-model="filters.dateFrom" dateFormat="yy-mm-dd" showIcon class="w-full"
               @keyup.enter="loadHistories" />
@@ -40,7 +34,7 @@
 
           <div class="filter-item">
             <label style="visibility: hidden">Thao tác</label>
-            <Button label="🔍 Tìm kiếm" @click="loadHistories" :loading="historyStore.loading" class="w-full" severity="primary" />
+            <Button label="Tìm kiếm" @click="loadHistories" :loading="historyStore.loading" class="w-full" severity="primary" />
           </div>
         </div>
       </template>
@@ -69,27 +63,9 @@
               </Tag>
             </template>
           </Column>
-          <Column field="market" header="Market" :style="{ width: '90px' }">
-            <template #body="slotProps">
-              <Tag v-if="slotProps.data.market" severity="secondary">
-                {{ slotProps.data.market }}
-              </Tag>
-              <span v-else style="color: #999">All</span>
-            </template>
-          </Column>
           <Column field="crawl_date" header="Ngày cào" :style="{ width: '105px' }" sortable>
             <template #body="slotProps">
               {{ formatDate(slotProps.data.crawl_date) }}
-            </template>
-          </Column>
-          <Column header="Check-in → Check-out" :style="{ width: '190px' }">
-            <template #body="slotProps">
-              <div v-if="slotProps.data.check_in && slotProps.data.check_out" style="font-size: 0.9em">
-                <span style="color: #10b981">{{ formatDate(slotProps.data.check_in) }}</span>
-                <span style="color: #999"> → </span>
-                <span style="color: #ef4444">{{ formatDate(slotProps.data.check_out) }}</span>
-              </div>
-              <span v-else style="color: #999">-</span>
             </template>
           </Column>
           <Column field="created_at" header="Lưu lúc" :style="{ width: '145px' }" sortable>
@@ -170,8 +146,7 @@ const filters = ref({
   source: 'Tất cả',
   dateFrom: null as Date | null,
   dateTo: null as Date | null,
-  scrapeType: 'all',
-  market: ''
+  scrapeType: 'all'
 })
 
 const sourceOptions = ['Tất cả', 'Booking', 'Agoda']
@@ -251,8 +226,7 @@ async function loadHistories() {
       filters.value.source === 'Tất cả' ? undefined : filters.value.source,
       dateFrom,
       dateTo,
-      filters.value.scrapeType,
-      filters.value.market
+      filters.value.scrapeType
     )
   } catch (error: any) {
     toast.add({

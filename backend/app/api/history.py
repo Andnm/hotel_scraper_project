@@ -95,7 +95,15 @@ async def delete_history(history_id: int):
 @router.get("/export/{history_id}")
 async def export_history_data(history_id: int):
     try:
+        history_repo = CrawlHistoryRepository()
         data_repo = CrawlDataRepository()
+        
+        # Get history to know scrape_type
+        history = history_repo.get_history_by_id(history_id)
+        if not history:
+            raise HTTPException(status_code=404, detail="History not found")
+        
+        scrape_type = history.get('scrape_type', 'info')
         records = data_repo.export_data_by_history(history_id)
         
         formatted_records = []
@@ -104,34 +112,50 @@ async def export_history_data(history_id: int):
             if isinstance(options, str):
                 options = json.loads(options) if options else {}
             
-            formatted_records.append({
-                'Hàng_gốc': options.get('row_number', ''),
-                'Ngày cào': record['crawl_date'].isoformat() if record.get('crawl_date') else '',
-                'Giờ cào': record['created_at'].strftime('%H:%M:%S') if record.get('created_at') else record.get('crawl_time', ''),
-                'Check in': record['check_in'].isoformat() if record.get('check_in') else '',
-                'Check out': record['check_out'].isoformat() if record.get('check_out') else '',
-                'Ngày cần cào': options.get('target_date', record.get('crawl_target') or ''),
-                'Tên khách sạn': record.get('hotel_name') or '',
-                'Link khách sạn': record.get('hotel_link') or '',
-                'Số lượng review': record.get('review_count') if record.get('review_count') else '',
-                'Điểm review': record.get('review_score') if record.get('review_score') else '',
-                'Các tiện nghi được ưa chuộng nhất': record.get('popular_facilities') or '',
-                'Tên hạng phòng': record.get('room_type') or '',
-                'Số lượng người': record.get('num_people') if record.get('num_people') else '',
-                'Giường': record.get('bed_info') or '',
-                'Diện tích phòng': record.get('room_area') or '',
-                'Các lựa chọn': options.get('facilities', ''),
-                'Giá sau giảm': record.get('price_after_discount') if record.get('price_after_discount') else '',
-                'Giá gốc': record.get('price_original') if record.get('price_original') else '',
-                'Giảm giá': record.get('discount_percent') or '',
-                'Market': record.get('Market') or '',
-                'Cluster': record.get('Cluster') or '',
-                'Level đối thủ': record.get('Level đối thủ') or '',
-                'Giá bao gồm bữa sáng': record.get('Giá bao gồm bữa sáng') or '',
-                'Nhóm hạng phòng': record.get('Nhóm hạng phòng') or '',
-                'Level': record.get('Level') or '',
-                'scrape_type': record.get('scrape_type', 'info') # Add scrape_type for frontend checking
-            })
+            if scrape_type == 'price':
+                # Price type: 16 columns in exact order
+                formatted_records.append({
+                    'Ngày cào': record['crawl_date'].isoformat() if record.get('crawl_date') else '',
+                    'Giờ cào': record.get('crawl_time') or (record['created_at'].strftime('%H:%M:%S') if record.get('created_at') else ''),
+                    'Check in': record['check_in'].isoformat() if record.get('check_in') else '',
+                    'Check out': record['check_out'].isoformat() if record.get('check_out') else '',
+                    'Tên khách sạn': record.get('hotel_name') or '',
+                    'Tên hạng phòng': record.get('room_type') or '',
+                    'Số lượng người': record.get('num_people') if record.get('num_people') else '',
+                    'Giá sau giảm': record.get('price_after_discount') if record.get('price_after_discount') else '',
+                    'Giá gốc': record.get('price_original') if record.get('price_original') else '',
+                    'Giảm giá': record.get('discount_percent') or '',
+                    'Market': record.get('Market') or '',
+                    'Cluster': record.get('Cluster') or '',
+                    'Level đối thủ': record.get('Level đối thủ') or '',
+                    'Giá bao gồm bữa sáng': record.get('Giá bao gồm bữa sáng') or '',
+                    'Nhóm hạng phòng': record.get('Nhóm hạng phòng') or '',
+                    'Level': record.get('Level') or ''
+                })
+            else:
+                # Info type: 17 columns in exact order
+                formatted_records.append({
+                    'Ngày cào': record['crawl_date'].isoformat() if record.get('crawl_date') else '',
+                    'Giờ cào': record.get('crawl_time') or (record['created_at'].strftime('%H:%M:%S') if record.get('created_at') else ''),
+                    'Check in': record['check_in'].isoformat() if record.get('check_in') else '',
+                    'Check out': record['check_out'].isoformat() if record.get('check_out') else '',
+                    'Tên khách sạn': record.get('hotel_name') or '',
+                    'Link khách sạn': record.get('hotel_link') or '',
+                    'Số lượng review': record.get('review_count') if record.get('review_count') else '',
+                    'Điểm review': record.get('review_score') if record.get('review_score') else '',
+                    'Các tiện nghi được ưa chuộng nhất': record.get('popular_facilities') or '',
+                    'Tên hạng phòng': record.get('room_type') or '',
+                    'Số lượng người': record.get('num_people') if record.get('num_people') else '',
+                    'Giường': record.get('bed_info') or '',
+                    'Diện tích phòng': record.get('room_area') or '',
+                    'Các lựa chọn': record.get('room_choices') or '',
+                    'Market': record.get('Market') or '',
+                    'Cluster': record.get('Cluster') or '',
+                    'Level đối thủ': record.get('Level đối thủ') or '',
+                    'Giá bao gồm bữa sáng': record.get('Giá bao gồm bữa sáng') or '',
+                    'Nhóm hạng phòng': record.get('Nhóm hạng phòng') or '',
+                    'Level': record.get('Level') or ''
+                })
         
         return formatted_records
     except Exception as e:
@@ -270,7 +294,7 @@ async def get_api_data(
             formatted_records.append({
                 'Hàng_gốc': options.get('row_number', ''),
                 'Ngày cào': record['crawl_date'].isoformat() if record.get('crawl_date') else '',
-                'Ngày cần cào': options.get('target_date', record.get('crawl_target') or ''),
+                'Ngày cần cào': options.get('target_date') or (record['check_in'].isoformat() if record.get('check_in') else ''),
                 'Tên khách sạn': record.get('hotel_name') or '',
                 'Link khách sạn': record.get('hotel_link') or '',
                 'Giá sau giảm': record.get('price_after_discount') if record.get('price_after_discount') else '',

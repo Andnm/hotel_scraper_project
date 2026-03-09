@@ -21,14 +21,13 @@ export const useHistoryStore = defineStore('history', () => {
     source?: string,
     dateFrom?: string,
     dateTo?: string,
-    scrapeType?: string,
-    market?: string
+    scrapeType?: string
   ) {
     loading.value = true
     error.value = null
     
     try {
-      const response = await historyService.getHistories(page, pageSize.value, source, dateFrom, dateTo, scrapeType, market)
+      const response = await historyService.getHistories(page, pageSize.value, source, dateFrom, dateTo, scrapeType)
       histories.value = response.items
       totalCount.value = response.total
       currentPage.value = response.page
