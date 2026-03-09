@@ -9,13 +9,14 @@ ENV APP_HOME=/app
 # Đặt thư mục làm việc
 WORKDIR $APP_HOME
 
-# Cài đặt các gói hệ thống cần thiết và TRÌNH DUYỆT CHROME (Sử dụng file .deb trực tiếp để ổn định hơn)
+# Cài đặt các gói hệ thống cần thiết, MySQL client và TRÌNH DUYỆT CHROME
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
     unzip \
     curl \
     ca-certificates \
+    default-mysql-client \
     fonts-liberation \
     libasound2 \
     libatk-bridge2.0-0 \
@@ -63,11 +64,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy toàn bộ code
 COPY . .
 
+# Copy và cấp quyền cho init-db script
+COPY init-db.sh /app/init-db.sh
+RUN chmod +x /app/init-db.sh
+
 # Tạo thư mục cho debug html
 RUN mkdir -p debug_html
 
 # Mở port 8000
 EXPOSE 8000
 
-# Lệnh chạy server
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Lệnh chạy: Init database rồi start server
+CMD ["/bin/bash", "-c", "/app/init-db.sh && uvicorn main:app --host 0.0.0.0 --port 8000"]

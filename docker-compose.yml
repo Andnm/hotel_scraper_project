@@ -13,7 +13,14 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./backend/app/database/setup.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - hotel_network
 
@@ -23,7 +30,8 @@ services:
     container_name: hotel_backend
     restart: always
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       DB_HOST: db
       DB_PORT: 3306
@@ -33,6 +41,8 @@ services:
     volumes:
       - ./backend/uploaded_files:/app/uploaded_files
       - ./backend/debug_html:/app/debug_html
+    ports:
+      - "8000:8000"
     networks:
       - hotel_network
 

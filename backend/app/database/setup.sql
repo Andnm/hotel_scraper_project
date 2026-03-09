@@ -1,14 +1,21 @@
--- DROP TABLE IF EXISTS crawl_history;
+-- =====================================================
+-- HOTEL SCRAPER DATABASE SCHEMA
+-- =====================================================
+-- This script creates all necessary tables for the hotel scraper application
+-- It should be run in the target database (hotel_scraper)
+-- For Docker deployment, this runs automatically via docker-entrypoint-initdb.d
+-- =====================================================
+
+-- Drop existing tables if needed (uncomment for fresh install)
 -- DROP TABLE IF EXISTS crawl_data;
+-- DROP TABLE IF EXISTS crawl_history;
 -- DROP TABLE IF EXISTS saved_data_sources;
 -- DROP TABLE IF EXISTS competitor_list;
 -- DROP TABLE IF EXISTS config_items;
 
--- Bảng lưu thông tin nguồn data (Excel hoặc Google Sheets)
-
-CREATE DATABASE IF NOT EXISTS hotel_scraper 
-
-USE hotel_scraper;
+-- Ensure we're using the correct database
+-- (This line is only needed for manual import, Docker handles this automatically)
+-- USE hotel_scraper;
 
 CREATE TABLE saved_data_sources (
   id            BIGINT AUTO_INCREMENT PRIMARY KEY,
