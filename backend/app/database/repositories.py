@@ -861,3 +861,97 @@ class CompetitorListRepository:
                 return result[0] if result else 0
             finally:
                 cursor.close()
+
+
+class TrackingRepository:
+    """Repository for tracking functionality"""
+    
+    def __init__(self, db_conn_func):
+        self.get_db = db_conn_func
+    
+    def get_price_crawl_histories(self) -> List[Dict]:
+        """Lấy danh sách các phiên cào với type = 'price'"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            try:
+                query = """
+                    SELECT id, crawl_date, crawl_time, source, market, check_in, check_out
+                    FROM crawl_history
+                    WHERE scrape_type = 'price'
+                    ORDER BY crawl_date DESC, crawl_time DESC
+                """
+                cursor.execute(query)
+                return cursor.fetchall()
+            finally:
+                cursor.close()
+    
+    def get_tracking_data(
+        self,
+        history_id: int,
+        year: int,
+        month: int,
+        market: str,
+        cluster: str,
+        breakfast: str,
+        room_group: str,
+        level: str
+    ) -> List[Dict]:
+        """Lấy dữ liệu tracking với filters"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            try:
+                query = """
+                    SELECT 
+                        cd.hotel_name,
+                        cd.room_type,
+                        cd.check_in,
+                        cd.price_after_discount,
+                        cl.market AS Market,
+                        cl.cluster AS Cluster,
+                        cl.breakfast_included AS 'Giá bao gồm bữa sáng',
+                        cl.room_group AS 'Nhóm hạng phòng',
+                        cl.level AS Level,
+                        cl.competitor_level AS 'Level đối thủ'
+                    FROM crawl_data cd
+                    LEFT JOIN competitor_list cl ON 
+                        TRIM(cd.hotel_name) = TRIM(cl.hotel_name)
+                        AND (cl.room_type IS NULL OR cl.room_type = '' OR TRIM(cd.room_type) = TRIM(cl.room_type))
+                    WHERE cd.history_id = %s
+                        AND cl.market = %s
+                        AND cl.cluster = %s
+                        AND cl.breakfast_included = %s
+                        AND cl.room_group = %s
+                        AND cl.level = %s
+                        AND YEAR(cd.check_in) = %s
+                        AND MONTH(cd.check_in) = %s
+                    ORDER BY cd.hotel_name, cd.room_type, cd.check_in
+                """
+                cursor.execute(query, (history_id, market, cluster, breakfast, room_group, level, year, month))
+                return cursor.fetchall()
+            finally:
+                cursor.close()
+    
+    def generate_month_dates(self, year: int, month: int) -> List[Dict]:
+        """Generate danh sách ngày trong tháng với thứ"""
+        from datetime import date, timedelta
+        import calendar
+        
+        # Get number of days in month
+        _, num_days = calendar.monthrange(year, month)
+        
+        # Vietnamese day names
+        day_names = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN']
+        
+        dates = []
+        for day in range(1, num_days + 1):
+            current_date = date(year, month, day)
+            weekday = current_date.weekday()  # 0 = Monday, 6 = Sunday
+            
+            dates.append({
+                'date': current_date.strftime('%Y-%m-%d'),
+                'day': day,
+                'weekday': day_names[weekday],
+                'display': f"{day_names[weekday]}<br/>({day:02d}/{month:02d}/{year})"
+            })
+        
+        return dates

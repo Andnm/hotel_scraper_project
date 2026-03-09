@@ -49,6 +49,13 @@ class DatabaseManager:
 
 db_manager = DatabaseManager()
 
+def get_db():
+    """
+    Get database connection from the pool.
+    Returns the connection for direct use.
+    """
+    return db_manager.get_connection()
+
 @contextmanager
 def get_db_connection() -> Generator:
     conn = db_manager.get_connection()

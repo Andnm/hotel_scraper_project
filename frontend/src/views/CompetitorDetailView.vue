@@ -116,7 +116,6 @@
       </template>
     </Card>
 
-    <ConfirmDialog />
     <Toast />
   </div>
 </template>
@@ -130,7 +129,6 @@ import axios from 'axios'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Toast from 'primevue/toast'
-import ConfirmDialog from 'primevue/confirmdialog'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const router = useRouter()
