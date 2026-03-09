@@ -28,7 +28,7 @@ wait_for_mysql() {
     local attempt=1
     
     while [ $attempt -le $max_attempts ]; do
-        if mysql -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASSWORD}" -e "SELECT 1" > /dev/null 2>&1; then
+        if mysql --skip-ssl -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASSWORD}" -e "SELECT 1" > /dev/null 2>&1; then
             echo "✅ MySQL is ready!"
             return 0
         fi
@@ -50,13 +50,13 @@ echo ""
 echo "📊 Checking database status..."
 
 # Check if database exists
-DB_EXISTS=$(mysql -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASSWORD}" \
+DB_EXISTS=$(mysql --skip-ssl -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASSWORD}" \
     -e "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='${DB_NAME}';" \
     --skip-column-names)
 
 if [ -z "$DB_EXISTS" ]; then
     echo "⚠️  Database '${DB_NAME}' does not exist. Creating..."
-    mysql -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASSWORD}" \
+    mysql --skip-ssl -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASSWORD}" \
         -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
     echo "✅ Database created successfully!"
 else
@@ -67,7 +67,7 @@ echo ""
 echo "📝 Checking tables..."
 
 # Check if tables exist
-TABLE_COUNT=$(mysql -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" \
+TABLE_COUNT=$(mysql --skip-ssl -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" \
     -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='${DB_NAME}';" \
     --skip-column-names)
 
@@ -75,7 +75,7 @@ if [ "$TABLE_COUNT" -eq "0" ]; then
     echo "⚠️  No tables found. Running setup.sql..."
     
     if [ -f "/app/app/database/setup.sql" ]; then
-        mysql -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" < /app/app/database/setup.sql
+        mysql --skip-ssl -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" < /app/app/database/setup.sql
         echo "✅ Database schema created successfully!"
     else
         echo "❌ setup.sql file not found!"
@@ -88,7 +88,7 @@ fi
 
 echo ""
 echo "📋 Database Tables:"
-mysql -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" \
+mysql --skip-ssl -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" \
     -e "SHOW TABLES;"
 
 echo ""
