@@ -75,9 +75,8 @@ def get_driver(is_headless=True):
         
         # Use webdriver_manager
         from webdriver_manager.chrome import ChromeDriverManager
-        from webdriver_manager.core.os_manager import ChromeType
         
-        service = ChromeService(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
+        service = ChromeService(ChromeDriverManager().install())
         
         driver = webdriver.Chrome(service=service, options=options)
         
