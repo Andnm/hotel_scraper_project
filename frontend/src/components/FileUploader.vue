@@ -26,7 +26,7 @@
       <div class="two-columns">
         <!-- Excel Upload Section -->
         <div class="column">
-          <label class="section-label">📂 Tải lên file Excel</label>
+          <label class="section-label">Tải lên file Excel</label>
           <FileUpload
             ref="fileUploadRef"
             mode="basic"
@@ -77,7 +77,7 @@
 
         <!-- Google Sheets Section -->
         <div class="column">
-          <label class="section-label">🔗 Import từ Google Sheets</label>
+          <label class="section-label">Tải lên từ Google Sheets</label>
           <InputText
             v-model="googleSheetUrl"
             placeholder="Nhập URL Google Sheet (ví dụ: https://docs.google.com/spreadsheets/d/...)"
@@ -104,7 +104,7 @@
             </div>
 
             <Button 
-              label="Import từ Google Sheets" 
+              label="Tải lên và xử lý" 
               icon="pi pi-link"
               class="w-full"
               style="margin-top: 1rem"
